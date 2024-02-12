@@ -1,0 +1,19 @@
+version: '3'
+services:
+  bootnode:
+    image: dlt-node
+    container_name: bootnode
+    hostname: bootnode
+    env_file: .env
+    command: ./bootnode_start.sh
+    network_mode: "host"
+
+  node1:
+    image: dlt-node
+    container_name: node1
+    hostname: node1
+    depends_on:
+      - bootnode
+    env_file: .env
+    command: ./node1_start.sh
+    network_mode: "host"
