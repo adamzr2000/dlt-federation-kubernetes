@@ -1,4 +1,4 @@
-# Federation with DLT and OSM-K8s
+# DLT Federation with K8s
 
 Short description...
 

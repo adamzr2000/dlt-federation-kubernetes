@@ -10,7 +10,7 @@ docker run \
   --name truffle \
   --hostname truffle \
   --network host \
-  -v $(pwd)/.env:/smart-contracts \
+  -v $(pwd)/.:/smart-contracts \
   truffle:latest 
 
 #$START_CMD
