@@ -2,7 +2,7 @@ from web3.auto import w3
 import os
 
 # Define the base directory path
-base_dir = "./"  # Change this to your base directory
+base_dir = "../."  # Change this to your base directory
 
 # Define the password to decrypt the keystore files
 password = "netcom;"

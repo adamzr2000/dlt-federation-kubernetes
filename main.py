@@ -1,36 +1,18 @@
-import random
-import sys
 import os
 import json
 import time
-import psutil
-import requests
-
-from web3 import Web3, HTTPProvider, IPCProvider
+from dotenv import load_dotenv
+from web3 import Web3, HTTPProvider, WebsocketProvider
 from web3.middleware import geth_poa_middleware
-
-from fastapi import FastAPI, Response
-from fastapi.responses import HTMLResponse
-from enum import Enum
-from io import StringIO
-from kubernetes import client, config
-
-import yaml
-import argparse
-import subprocess
-
-
-class DescriptorEnum(str, Enum):
-    nginx = "nginx"
-    openldap = "openldap"
+from fastapi import FastAPI
 
 
 app = FastAPI(
-    title="Federation with DLT And OSM-K8s API Documentation",
+    title="DLT Federation with K8s API Documentation",
     description="""
 - This API provides endpoints for interacting with the DLT network.
 
-- The federation procedures are stored and deployed on a Federation Smart Contract, which is running on top of a blockchain network.
+- The federation procedures are stored and deployed on a Federation Smart Contract, which is running on top of a private blockchain network.
 
 - ADs communicate with the smart contract through transactions.
 
@@ -59,152 +41,86 @@ Provider AD starts the deployment of the requested federated service
 **5) USAGE & CHARGING**
 
 Once the provider deploys the federated service, it notifies the consumer AD
-
----
-### Access to OSM GUI:
-
-User: **admin**
-
-Password: **admin**
-
-[Click here to access the OSM GUI (10.5.50.100)](http://10.5.50.100)
-
-[Click here to access the OSM GUI (10.5.50.101)](http://10.5.50.101)
-
 """
 )
 
-while True:
-    debug_txt = input("Domain function: ")
-    if debug_txt == "consumer" or debug_txt == "provider":
-        break
+# Initial setup: Determine domain and load environment variables
+domain = input("Domain function (consumer/provider): ").strip().lower()
+while domain not in ["consumer", "provider"]:
+    print("Invalid input. Please enter 'consumer' or 'provider'.")
+    domain = input("Domain function (consumer/provider): ").strip().lower()
+
+# Load environment variables
+load_dotenv('./dlt-network-docker/.env')
+load_dotenv('./smart-contracts/.env', override=True)
+
+# Configure Web3
+eth_node_url = os.getenv(f'WS_NODE_{"1" if domain == "consumer" else "2"}_URL')
+try:
+    web3 = Web3(WebsocketProvider(eth_node_url))
+    web3.middleware_onion.inject(geth_poa_middleware, layer=0)
+
+    # Check if connected to the Ethereum node
+    if web3.isConnected():
+        # Attempt to get the Geth version to confirm a successful connection
+        geth_version = web3.clientVersion
+        print(f"Connected to Ethereum node successfully. Geth version: {geth_version}")
     else:
-        print("Invalid input. Please enter 'consumer' or 'provider'.")
+        print("Failed to connect to the Ethereum node.")
+except Exception as e:
+    print(f"An error occurred while trying to connect to the Ethereum node: {e}")
 
-domain = debug_txt
-
-if domain == "consumer":
-    # Configure the web3 interface to the Blockchain and SC
-    web3= Web3(Web3.WebsocketProvider("ws://10.5.50.100:3334")) 
-
-if domain == "provider":
-    # Configure the web3 interface to the Blockchain and SC
-    web3= Web3(Web3.WebsocketProvider("ws://10.5.50.101:3335")) 
-
-web3.middleware_onion.inject(geth_poa_middleware, layer=0) 
-
-# Load the ABI of the smart contract from a JSON file
-abi_path = "smart-contracts/build/contracts/"
-with open(abi_path+"Federation.json") as c_json:
-   contract_json = json.load(c_json)
-
-contract_abi = contract_json["abi"]
-
-# Contract address using the mnemonic "netcom;" on Ganache
-contract_address = Web3.toChecksumAddress('0x1AbF5A30fea55787fe60f221a5491E3B8Fe08BfA')
-
-private_key_account_1 = "7ce9df652098c219931198e24d9c2dbe952e140f24a6541dcd038f9a22123309"
-private_key_account_2 = ""
-
-# Instance of the smart contract
+# Load smart contract ABI
+contract_abi = json.load(open("smart-contracts/build/contracts/Federation.json"))["abi"]
+contract_address = web3.toChecksumAddress(os.getenv('CONTRACT_ADDRESS'))
 Federation_contract = web3.eth.contract(abi=contract_abi, address=contract_address)
 
-# List of accounts available on the connected Ethereum node (Ganache)
-eth_address = web3.eth.accounts
+# Retrieve private key and blockchain address for the domain
+private_key = os.getenv(f'PRIVATE_KEY_NODE_{"1" if domain == "consumer" else "2"}')
+block_address = os.getenv(f'ETHERBASE_NODE_{"1" if domain == "consumer" else "2"}')
+
+# General setup
+ip_address = os.popen('ip a | grep 10.5.50').read().split('inet ', 1)[1].split('/', 1)[0]
+nonce = web3.eth.getTransactionCount(block_address)
 
 # Address of the miner (node that adds a block to the blockchain)
-coinbase = eth_address[0] 
+coinbase = block_address
 
+# Initialize domain-specific configurations and variables
+if domain == "consumer":
+    # Consumer-specific variables
+    service_id = 'service' + str(int(time.time()))
+    service_endpoint_consumer = ip_address
+    service_consumer_address = block_address
+    service_requirements = 'service='
+    bids_event = None  # Placeholder for event listener setup
+    domain_name = "AD1"
+    # Additional setup or actions for the consumer can be added here
+else:  # Provider
+    # Provider-specific variables
+    service_endpoint_provider = ip_address
+    federated_host = ''  # Placeholder for federated service deployment
+    service_price = 0
+    bid_index = 0
+    winner = web3.eth.accounts[0]  # Assuming the first account as the default winner for simplicity
+    manager_address = ''  # Placeholder for manager contract address
+    winnerChosen_event = None  # Placeholder for event listener setup
+    domain_name = "AD2"
+    # Additional setup or actions for the provider can be added here
 
-#-------------------------- Configure CONSUMER variables --------------------------#
-timestamp = int(time.time())
-service_id = ''
-service_endpoint_consumer = ''
-service_consumer_address = ''
-service_requirements = 'service='
-bids_event = None
-#----------------------------------------------------------------------------------#
-
-
-#-------------------------- Configure PROVIDER variables --------------------------#
-service_endpoint_provider = ''
-federated_host = ''
-service_price = 0
-bid_index = 0
-winner = coinbase
-manager_address = ''
-winnerChosen_event = None
-#----------------------------------------------------------------------------------#
+print(f"Configuration complete for {domain_name} with IP {service_endpoint}.")
 
 #-------------------------- Configure TEST variables ------------------------------#
 # Initialize a list to store the times of each federation step
 federation_step_times = []
 #----------------------------------------------------------------------------------#
 
-# Configure the IP address
-stream = os.popen('ip a | grep 10.5.50').read()
-stream = stream.split('inet ',1)
-ip_address = stream[1].split('/',1)
-ipaddress = ip_address[0]
-
 # Configure the domain variables
 domain_registered = False
-
-if domain == 'consumer':
-   block_address = eth_address[1]
-   private_key = private_key_account_1
-   timestamp = int(time.time())
-   service_id = 'service'+str(timestamp)
-   service_endpoint_consumer = ipaddress
-   service_consumer_address = block_address
-   domain_name = "AD1"
-   vim_name = "VIM_" + domain_name
-
-else:
-   block_address = eth_address[1]
-   private_key = private_key_account_2
-   service_endpoint_provider = ipaddress
-   service_id = ''
-   domain_name = "AD2"
-
-nonce = web3.eth.getTransactionCount(block_address)
 
 def send_signed_transaction(build_transaction):
     signed_txn = web3.eth.account.signTransaction(build_transaction, private_key)
     return web3.eth.sendRawTransaction(signed_txn.rawTransaction)
-
-# Configure OSM variables: VIM account, K8s cluster, VNFD-NSD info
-vim_name = "dummy_vim_" + domain_name
-cluster_name = "cluster_" + domain_name
-nsd_name = ''
-vnfd_name = ''
-member_vnf_index = ''
-kdu_name = ''
-
-def select_descriptor(descriptor):
-    global nsd_name
-    global vnfd_name
-    global member_vnf_index
-    global kdu_name
-
-    global service_requirements
-    service_requirements = service_requirements + descriptor
-
-    if descriptor == "nginx":
-        nsd_name = 'nginx_ns'
-        vnfd_name = 'nginx_knf'
-        member_vnf_index = 'nginx'
-        kdu_name = 'nginx'
-    elif descriptor == "openldap":
-        nsd_name = 'openldap_ns'
-        vnfd_name = 'openldap_knf'
-        member_vnf_index = 'openldap'
-        kdu_name = 'ldap'
-    else:
-        nsd_name = ''
-        vnfd_name = ''
-        member_vnf_index = ''
-        kdu_name = ''
 
 # Consumer AD announces that he needs a federated service and reveals his ip address (192.168.56.104)
 def AnnounceService():
@@ -343,290 +259,26 @@ def DisplayServiceState(serviceID):
         print(f"Error: state for service {serviceID} is {current_service_state}")
 
 
-def get_kubernetes_server_version():
-    try:
-        # Load the Kubernetes configuration
-        config.load_kube_config()
+# def get_kubernetes_server_version():
+#     try:
+#         # Load the Kubernetes configuration
+#         config.load_kube_config()
 
-        # Create an instance of the Kubernetes API client
-        api_client = client.VersionApi()
+#         # Create an instance of the Kubernetes API client
+#         api_client = client.VersionApi()
 
-        # Retrieve the server version
-        api_response = api_client.get_code()
-        server_version = api_response.git_version
+#         # Retrieve the server version
+#         api_response = api_client.get_code()
+#         server_version = api_response.git_version
 
-        return server_version
-    except Exception as e:
-        print(f"Error occurred: {str(e)}")
-        return None
-
-
-def get_service_deployed_info():
-    # Execute the 'osm project-list' command and capture the output
-    output = subprocess.check_output(['osm', 'project-list']).decode('utf-8')
-
-    # Process the output to extract the ID of the OSM project
-    lines = output.strip().split('\n')
-    header = [column.strip() for column in lines[1].split('|') if column.strip()]
-    data = [value.strip() for value in lines[3].split('|') if value.strip()]
-    id_index = header.index('id')
-    project_id = data[id_index]
-
-    # Execute the 'kubectl get services' command and capture the output
-    output = subprocess.check_output(['kubectl', 'get', 'services', '-n', project_id]).decode('utf-8')
-
-    # Process the output to extract the external ip assigned by the loadbalancer of the provider, so that it can be used by the consumer.
-    lines = output.strip().split('\n')
-    header = lines[0].split()
-    data = lines[1].split()
-    external_ip_index = header.index('EXTERNAL-IP')
-    external_ip = data[external_ip_index]
-
-    return external_ip
-
-# Returns the id of the vnfd
-def create_nfpkg(package_path):
-    command = f"osm nfpkg-create {package_path}"
-    output = subprocess.check_output(command, shell=True, text=True).strip().split('\n')[-1]
-    return output
-
-# Returns the id of the nsd
-def create_nspkg(package_path):
-    command = f"osm nspkg-create {package_path}"
-    output = subprocess.check_output(command, shell=True, text=True).strip().split('\n')[-1]
-    return output
+#         return server_version
+#     except Exception as e:
+#         print(f"Error occurred: {str(e)}")
+#         return None
 
 
-def create_nsi(ns_name, wait):
-    config_file = f"descriptors/{nsd_name}/params/params.yaml"
-    command = f"osm ns-create --ns_name {ns_name} --nsd_name {nsd_name} --vim_account {vim_name} --config_file {config_file}"
-    if wait: 
-        command += " --wait"
-    output = subprocess.check_output(command, shell=True, text=True).strip().split('\n')[-1]
-    return output
+# -------------------------------------------- K8S API FUNCTIONS --------------------------------------------#
 
-
-def upgrade_nsi(ns_name, replicas, wait):
-    # openldap_ns -> string, nginx_ns -> integer
-    if nsd_name == "openldap_ns":
-        params = f'{{"replicaCount": "{replicas}"}}' 
-    if nsd_name == "nginx_ns":
-        params = f'{{"replicaCount": {replicas}}}'
-    command = f"osm ns-action {ns_name} --vnf_name {member_vnf_index} --kdu_name {kdu_name} --action_name upgrade --params '{params}'"
-    if wait:
-        command += " --wait"
-    output = subprocess.check_output(command, shell=True, text=True).strip().split('\n')[-1]
-    return output
-
-def delete_nsi(ns_name, wait):
-    command = f"osm ns-delete {ns_name}"
-    if wait:
-        command += " --wait"
-    subprocess.check_output(command, shell=True)
-
-
-def clean_all():
-    command = f'osm nsd-delete {nsd_name}'
-    subprocess.check_output(command, shell=True)
-    command = f'osm vnfd-delete {vnfd_name}'
-    subprocess.check_output(command, shell=True)
-    command = f'osm k8scluster-delete {cluster_name} --wait'
-    subprocess.check_output(command, shell=True)
-    command = f'osm repo-delete bitnami'
-    subprocess.check_output(command, shell=True)
-    command = f'osm vim-delete {vim_name} --wait'
-    subprocess.check_output(command, shell=True)
-
-
-def create_csv_file(file_name, header, data):
-    with open(file_name, 'w', encoding='UTF8', newline='') as f:
-        writer = csv.writer(f)
-
-        # Write the header
-        writer.writerow(header)
-
-        # Write the data
-        writer.writerows(data)
-
-
-# -------------------------------------------- OSM API FUNCTIONS --------------------------------------------#
-@app.post("/osm_create_dummy_vim", summary="Create a new dummy VIM account", tags=["OSM Functions"],
-description="""
-```bash
-osm vim-create --name {vim_name} --user u --password p --tenant p --account_type dummy --auth_url http://localhost/dummy
-```
-""")
-def osm_create_dummy_vim():
-    user = 'u'
-    password = 'p'
-    vim_type = 'dummy'
-    auth_url = 'http://localhost/dummy'
-    try:
-        cmd = subprocess.run(
-            ['osm', 'vim-create', '--name', vim_name, '--user', user, '--password', password, '--tenant', 'p', '--account_type', vim_type, '--auth_url', auth_url, '--wait'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        output = cmd.stdout.strip() if cmd.stdout is not None else ''  # Check if stdout is None
-        return {"message": "New VIM account created", "ID": output, "Name": vim_name, "Type": vim_type, "User": user, "Password": password, "URL": auth_url}
-    except subprocess.CalledProcessError as e:
-        error_output = e.stderr.strip() if e.stderr is not None else ''  # Check if stderr is None
-        return {"message": "Error creating VIM account", "error": error_output}
-
-
-@app.post("/osm_K8s_cluster_add", summary="Add a K8s cluster to OSM", tags=["OSM Functions"],
-description="""
-```bash
-osm k8scluster-add {cluster_name} --creds ~/.kube/config --vim {vim_name} --k8s-nets '{k8s_net1: null}' --version "{k8s_cluster_version}" --description="Isolated K8s cluster"
-```
-""")
-def osm_K8s_cluster_add():
-    kube_config = os.path.expanduser("~/.kube/config")
-    k8s_cluster_version = get_kubernetes_server_version()
-    try:
-        # Add helm repo to OSM for using nginx
-        cmd = subprocess.run(
-            ['osm', 'repo-add', '--type', 'helm-chart', '--description', 'Bitnami repo', 'bitnami', 'https://charts.bitnami.com/bitnami'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        cmd = subprocess.run(
-            ['osm', 'k8scluster-add', cluster_name, '--creds', kube_config, '--vim', vim_name, '--k8s-nets', '{k8s_net1: null}', '--version', k8s_cluster_version, '--description=Isolated K8s cluster', '--wait'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        output = cmd.stdout.strip() if cmd.stdout is not None else ''  # Check if stdout is None
-        return {"message": "New K8s cluster added to OSM", "Name": cluster_name, "ID": output, "Associated VIM": vim_name}
-    except subprocess.CalledProcessError as e:
-        error_output = e.stderr.strip() if e.stderr is not None else ''  # Check if stderr is None
-        return {"message": "Error adding K8s cluster to OSM", "error": error_output}
-
-@app.post("/osm_select_descriptors/{descriptor}", summary="Select the descriptors you are going to use", tags=["OSM Functions"])
-def osm_select_descriptors(descriptor: DescriptorEnum):
-    select_descriptor(descriptor)
-    return {"Descriptor selected": descriptor, "NSD": nsd_name, "VNFD": vnfd_name, "KDU": kdu_name}
-
-@app.post("/osm_onboard_descriptors", summary="Creates the VNFD and NSD packages and upload them to OSM", tags=["OSM Functions"],
-description="""
-```bash
-osm nfpkg-create {vnfd_name}
-osm nspkg-create {nsd_name}
-```
-""")
-def osm_onboard_descriptors():
-    vnfd_path = "descriptors/" + vnfd_name
-    nsd_path = "descriptors/" + nsd_name
-
-    vnf_id = create_nfpkg(vnfd_path)
-    ns_id = create_nspkg(nsd_path)
-    vnf_info = {
-        "Name": vnfd_name,
-        "ID":  vnf_id,
-        "KDU": kdu_name
-    }
-    ns_info = {
-        "Name": nsd_name,
-        "ID":  ns_id
-    }
-    return {"message": "VNFD/NSD packages onboarded to OSM", "VNFD info": vnf_info, "NSD info": ns_info}
-
-@app.post("/osm_create_NS_instance/{ns_name}/{wait}", tags=["OSM Functions"], 
-summary="Create a new Network Service instance",
-description="""
-```bash
-osm ns-create --ns_name {ns_name} --nsd_name {nsd_name} --vim_account {vim_name} --config_file descriptors/{nsd_name}/params/params.yaml
-```
-""")
-def osm_create_NS_instance(ns_name: str, wait: bool):
-    nsi_id = create_nsi(ns_name, wait)
-    nsi_info = {
-        "Name": ns_name,
-        #"Replicas": replicas,
-        "ID":  nsi_id
-    }
-    return {"message": "Network Service instance created", "NSI info": nsi_info}
-
-
-@app.patch("/osm_upgrade_NS_instance/{ns_name}/{replicas}/{wait}", tags=["OSM Functions"],
-summary="Change the number of replicas (pods) of an existing service",
-description="""
-```bash
-osm ns-action {ns_name} --vnf_name {vnf_name} --kdu_name {kdu_name} --action_name upgrade --params '{"replicaCount": "{replicas}"}'
-```
-""")
-def osm_upgrade_NS_instance(ns_name: str, replicas: str, wait: bool):
-    nsi_id = upgrade_nsi(ns_name, replicas, wait)
-    nsi_info = {
-        "Name": ns_name,
-        "Replicas": replicas,
-        "ID":  nsi_id
-    }
-    return {"message": "Network Service instance upgraded", "NSI info": nsi_info}
-
-
-@app.delete("/osm_delete_NS_instance/{ns_name}/{wait}", tags=["OSM Functions"],
-summary="Delete an existing Network Service instance",
-description="""
-```bash
-osm ns-delete {ns_name} 
-```
-""")
-def osm_delete_NS_instance(ns_name: str, wait: bool):
-    delete_nsi(ns_name, wait)
-    return {"message": f"{ns_name} instance has been deleted successfully"}
-
-
-@app.delete("/osm_clean_all", tags=["OSM Functions"],
-summary="Delete NSD and VNFD packages, K8s cluster and VIM account from OSM",
-description="""
-**Make sure you don't have any active Network Services!**
-
-```bash
-osm nsd-delete {nsd_name}
-osm vnfd-delete {vnfd_name}
-osm k8scluster-delete {cluster_name} --wait
-osm vim-delete {vim_name} --wait
-```
-""")
-def osm_clean_all():
-    clean_all()
-    return {"message": "All OSM components (NSD, VNFD, K8sCluster, VIM) have been deleted successfully"}
-
-
-@app.post("/kubernetes_enable_monitoring", tags=["Kubernetes Functions"],
-summary="Enable monitoring in the Kubernetes cluster with Grafana and Prometheus")
-def kubernetes_enable_monitoring():
-    #subprocess.run(['helm', 'repo', 'add', 'prom-repo', 'https://prometheus-community.github.io/helm-charts'])
-    #time.sleep(3)
-    command = [
-        'helm',
-        'install',
-        'monitoring',
-        'prom-repo/kube-prometheus-stack',
-        '-n', 'monitoring',
-        '--create-namespace',
-        '--values=grafana_conf/grafana_values.yaml'
-    ]   
-    subprocess.run(command)
-    return {"message": "Grafana and Prometheus have been installed successfully"}
-
-
-@app.delete("/kubernetes_disable_monitoring", tags=["Kubernetes Functions"],
-summary="Disable monitoring in the Kubernetes cluster with Grafana and Prometheus")
-def kubernetes_disable_monitoring():
-    command = [
-        'helm',
-        'uninstall',
-        'monitoring',
-        '-n', 'monitoring'
-    ]
-    subprocess.run(command)
-    #subprocess.run(['helm', 'repo', 'remove', 'prom-repo'])
-    #time.sleep(3)
-    return {"message": "Grafana and Prometheus have been disabled successfully"}
 # ------------------------------------------------------------------------------------------------------------------------------#
 
 
@@ -710,8 +362,6 @@ def check_service_state(service_id: str):
     else:
         return { "Error" : f"Service ID {service_id}, state is {current_service_state}"}
     
-
-
 
 @app.get("/check_deployed_info/{service_id}", tags=["Default DLT Functions"])
 def check_deployed_info(service_id: str):
@@ -889,243 +539,234 @@ def deploy_service(service_id: str):
         return {"Error": "You are not the winner"}   
 # ------------------------------------------------------------------------------------------------------------------------------#
 
-def check_federated_service_connection(external_ip):
-    url = "http://" + external_ip  # IP of the requested federated service
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return True, response.content.decode('utf-8')
-    except requests.exceptions.RequestException:
-        pass
 
-    return False, None
 
 
 
 # -------------------------------------------- TEST DEPLOYMENT: DLT WITH OSM-K8s --------------------------------------------#
-@app.get("/consumer_code", tags=["Test deployment: federation of a K8s service in OSM"])
-def consumer_code():
+# @app.get("/consumer_code", tags=["Test deployment: federation of a K8s service in OSM"])
+# def consumer_code():
 
-    header = ['step', 'timestamp']
-    data = []
+#     header = ['step', 'timestamp']
+#     data = []
     
-    if domain == 'consumer':
+#     if domain == 'consumer':
         
-        # Start time of the process
-        process_start_time = time.time()
+#         # Start time of the process
+#         process_start_time = time.time()
         
-        global bids_event
+#         global bids_event
 
-        # Consumer creates a Network Service Instance composed of 1 KNF (Kubernetes Network Function)
-        #nsi_id = create_nsi("test", True)
+#         # Consumer creates a Network Service Instance composed of 1 KNF (Kubernetes Network Function)
+#         #nsi_id = create_nsi("test", True)
        
-        print("\nSERVICE_ID:", service_id) # service + timestamp
+#         print("\nSERVICE_ID:", service_id) # service + timestamp
         
-        # Service Announcement Sent
-        t_serviceAnnouncementSent = time.time() - process_start_time
-        data.append(['serviceAnnouncementSent', t_serviceAnnouncementSent])
-        bids_event = AnnounceService()
+#         # Service Announcement Sent
+#         t_serviceAnnouncementSent = time.time() - process_start_time
+#         data.append(['serviceAnnouncementSent', t_serviceAnnouncementSent])
+#         bids_event = AnnounceService()
 
-        print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
+#         print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
 
-        # Consumer AD wait for provider bids
-        bidderArrived = False
+#         # Consumer AD wait for provider bids
+#         bidderArrived = False
 
-        print("Waiting for bids...\n")
-        while bidderArrived == False:
-            new_events = bids_event.get_all_entries()
-            for event in new_events:
+#         print("Waiting for bids...\n")
+#         while bidderArrived == False:
+#             new_events = bids_event.get_all_entries()
+#             for event in new_events:
                 
-                # Bid Offer Received
-                t_bidOfferReceived = time.time() - process_start_time
-                data.append(['bidOfferReceived', t_bidOfferReceived])
+#                 # Bid Offer Received
+#                 t_bidOfferReceived = time.time() - process_start_time
+#                 data.append(['bidOfferReceived', t_bidOfferReceived])
 
-                event_id = str(web3.toText(event['args']['_id']))
+#                 event_id = str(web3.toText(event['args']['_id']))
                 
-                # Choosing provider
-                t_choosingProvider = time.time() - process_start_time
-                data.append(['choosingProvider', t_choosingProvider])
+#                 # Choosing provider
+#                 t_choosingProvider = time.time() - process_start_time
+#                 data.append(['choosingProvider', t_choosingProvider])
 
-                # service id, service id, index of the bid
-                print(service_id, web3.toText(event['args']['_id']), event['args']['max_bid_index'])
-                print("BIDS ENTERED")
-                bid_index = int(event['args']['max_bid_index'])
-                bidderArrived = True 
-                if int(bid_index) < 2:
+#                 # service id, service id, index of the bid
+#                 print(service_id, web3.toText(event['args']['_id']), event['args']['max_bid_index'])
+#                 print("BIDS ENTERED")
+#                 bid_index = int(event['args']['max_bid_index'])
+#                 bidderArrived = True 
+#                 if int(bid_index) < 2:
 
-                    #print("\nBids-info = [provider address , service price , bid index]\n")
-                    bid_info = GetBidInfo(int(bid_index-1))
-                    print(bid_info)
+#                     #print("\nBids-info = [provider address , service price , bid index]\n")
+#                     bid_info = GetBidInfo(int(bid_index-1))
+#                     print(bid_info)
                     
-                    # Provider choosen
-                    t_providerChoosen = time.time() - process_start_time
-                    data.append(['providerChoosen', t_providerChoosen])
-                    ChooseProvider(int(bid_index)-1)
+#                     # Provider choosen
+#                     t_providerChoosen = time.time() - process_start_time
+#                     data.append(['providerChoosen', t_providerChoosen])
+#                     ChooseProvider(int(bid_index)-1)
 
-                    # Winner choosen sent
-                    t_winnerChoosenSent = t_providerChoosen
-                    data.append(['winnerChoosenSent', t_winnerChoosenSent])
+#                     # Winner choosen sent
+#                     t_winnerChoosenSent = t_providerChoosen
+#                     data.append(['winnerChoosenSent', t_winnerChoosenSent])
 
-                    print("\n\033[1;32m(TX-3) Provider choosen! (bid index=" + str(bid_index-1) + ")\033[0m")
+#                     print("\n\033[1;32m(TX-3) Provider choosen! (bid index=" + str(bid_index-1) + ")\033[0m")
 
-                    # Service closed (state 1)
-                    #DisplayServiceState(service_id)
-                    break
+#                     # Service closed (state 1)
+#                     #DisplayServiceState(service_id)
+#                     break
 
-        # Consumer AD wait for provider confirmation
-        serviceDeployed = False 
-        while serviceDeployed == False:
-            serviceDeployed = True if GetServiceState(service_id) == 2 else False
+#         # Consumer AD wait for provider confirmation
+#         serviceDeployed = False 
+#         while serviceDeployed == False:
+#             serviceDeployed = True if GetServiceState(service_id) == 2 else False
         
-        # Confirmation received
-        t_confirmDeploymentReceived = time.time() - process_start_time
-        data.append(['confirmDeploymentReceived', t_confirmDeploymentReceived])
+#         # Confirmation received
+#         t_confirmDeploymentReceived = time.time() - process_start_time
+#         data.append(['confirmDeploymentReceived', t_confirmDeploymentReceived])
         
-        t_checkConnectivityFederatedServiceStart = time.time() - process_start_time
-        data.append(['checkConnectivityFederatedServiceStart', t_checkConnectivityFederatedServiceStart])
+#         t_checkConnectivityFederatedServiceStart = time.time() - process_start_time
+#         data.append(['checkConnectivityFederatedServiceStart', t_checkConnectivityFederatedServiceStart])
 
-        # Service deployed info
-        external_ip, service_endpoint_provider = GetDeployedInfo(service_id)
+#         # Service deployed info
+#         external_ip, service_endpoint_provider = GetDeployedInfo(service_id)
         
-        external_ip = external_ip.decode('utf-8')
-        service_endpoint_provider = service_endpoint_provider.decode('utf-8')
+#         external_ip = external_ip.decode('utf-8')
+#         service_endpoint_provider = service_endpoint_provider.decode('utf-8')
 
-        print("Service deployed info:")
-        print("External IP:", external_ip)
-        print("Service endpoint provider:", service_endpoint_provider)
+#         print("Service deployed info:")
+#         print("External IP:", external_ip)
+#         print("Service endpoint provider:", service_endpoint_provider)
 
 
-        # Establish connectivity with the federated service
-        connected = False
-        while not connected:
-            connected, response_content = check_federated_service_connection(external_ip)
-            if not connected:
-                print("Failed to establish connection with the federated service. Retrying...")
+#         # Establish connectivity with the federated service
+#         connected = False
+#         while not connected:
+#             connected, response_content = check_federated_service_connection(external_ip)
+#             if not connected:
+#                 print("Failed to establish connection with the federated service. Retrying...")
         
-        t_checkConnectivityFederatedServiceFinished = time.time() - process_start_time
-        data.append(['checkConnectivityFederatedServiceFinished', t_checkConnectivityFederatedServiceFinished])
+#         t_checkConnectivityFederatedServiceFinished = time.time() - process_start_time
+#         data.append(['checkConnectivityFederatedServiceFinished', t_checkConnectivityFederatedServiceFinished])
 
-        print("Successfully connected to the federated service")
-        print(response_content)
+#         print("Successfully connected to the federated service")
+#         print(response_content)
 
-        # Export the data to a csv file
-        create_csv_file('federation_private_network_consumer.csv', header, data)
+#         # Export the data to a csv file
+#         create_csv_file('federation_private_network_consumer.csv', header, data)
 
-        return {"message": "Federation process (which involves announcement offer, negotiation and acceptance) successful"}
-    else:
-        return {"error": "You must be consumer to run this code"}
+#         return {"message": "Federation process (which involves announcement offer, negotiation and acceptance) successful"}
+#     else:
+#         return {"error": "You must be consumer to run this code"}
 
 
-@app.get("/provider_code", tags=["Test deployment: federation of a K8s service in OSM"])
-def provider_code():
+# @app.get("/provider_code", tags=["Test deployment: federation of a K8s service in OSM"])
+# def provider_code():
     
-    header = ['step', 'timestamp']
-    data = []
+#     header = ['step', 'timestamp']
+#     data = []
     
-    if domain == 'provider':
+#     if domain == 'provider':
         
-        # Start time of the process
-        process_start_time = time.time()
+#         # Start time of the process
+#         process_start_time = time.time()
 
-        global winnerChosen_event 
-        service_id = ''
-        print("\nSERVICE_ID:",service_id)
+#         global winnerChosen_event 
+#         service_id = ''
+#         print("\nSERVICE_ID:",service_id)
 
-        newService_event = ServiceAnnouncementEvent()
-        newService = False
-        open_services = []
+#         newService_event = ServiceAnnouncementEvent()
+#         newService = False
+#         open_services = []
 
-        # Provider AD wait for service announcements
-        while newService == False:
-            new_events = newService_event.get_all_entries()
-            for event in new_events:
-                service_id = web3.toText(event['args']['id'])
+#         # Provider AD wait for service announcements
+#         while newService == False:
+#             new_events = newService_event.get_all_entries()
+#             for event in new_events:
+#                 service_id = web3.toText(event['args']['id'])
                 
-                requirements = web3.toText(event['args']['requirements'])
+#                 requirements = web3.toText(event['args']['requirements'])
 
-                requested_service = requirements.split("=")[1]
-                # Removes null characters at the end of the string
-                requested_service = requested_service.rstrip('\x00') 
+#                 requested_service = requirements.split("=")[1]
+#                 # Removes null characters at the end of the string
+#                 requested_service = requested_service.rstrip('\x00') 
                 
-                if GetServiceState(service_id) == 0:
-                    open_services.append(service_id)
-            print("OPEN =", len(open_services)) 
-            if len(open_services) > 0:
+#                 if GetServiceState(service_id) == 0:
+#                     open_services.append(service_id)
+#             print("OPEN =", len(open_services)) 
+#             if len(open_services) > 0:
                 
-                # Announcement received
-                t_serviceAnnouncementReceived = time.time() - process_start_time
-                data.append(['serviceAnnouncementReceived', t_serviceAnnouncementReceived])
+#                 # Announcement received
+#                 t_serviceAnnouncementReceived = time.time() - process_start_time
+#                 data.append(['serviceAnnouncementReceived', t_serviceAnnouncementReceived])
 
-                print('Announcement received:')
-                print(new_events)
-                print("\n\033[1;33mRequested service: " + repr(requested_service) + "\033[0m")
-                newService = True
+#                 print('Announcement received:')
+#                 print(new_events)
+#                 print("\n\033[1;33mRequested service: " + repr(requested_service) + "\033[0m")
+#                 newService = True
             
-        service_id = open_services[-1]
+#         service_id = open_services[-1]
 
-        # Place a bid offer to the Federation SC
-        t_bidOfferSent = time.time() - process_start_time
-        data.append(['bidOfferSent', t_bidOfferSent])
-        winnerChosen_event = PlaceBid(service_id, 10)
+#         # Place a bid offer to the Federation SC
+#         t_bidOfferSent = time.time() - process_start_time
+#         data.append(['bidOfferSent', t_bidOfferSent])
+#         winnerChosen_event = PlaceBid(service_id, 10)
 
-        print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
+#         print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
         
-        # Ask to the Federation SC if there is a winner (wait...)
+#         # Ask to the Federation SC if there is a winner (wait...)
     
-        winnerChosen = False
-        while winnerChosen == False:
-            new_events = winnerChosen_event.get_all_entries()
-            for event in new_events:
-                event_serviceid = web3.toText(event['args']['_id'])
-                if event_serviceid == service_id:
+#         winnerChosen = False
+#         while winnerChosen == False:
+#             new_events = winnerChosen_event.get_all_entries()
+#             for event in new_events:
+#                 event_serviceid = web3.toText(event['args']['_id'])
+#                 if event_serviceid == service_id:
                     
-                    # Winner choosen received
-                    t_winnerChoosenReceived = time.time() - process_start_time
-                    data.append(['winnerChoosenReceived', t_winnerChoosenReceived])
+#                     # Winner choosen received
+#                     t_winnerChoosenReceived = time.time() - process_start_time
+#                     data.append(['winnerChoosenReceived', t_winnerChoosenReceived])
 
-                    winnerChosen = True
-                    break
+#                     winnerChosen = True
+#                     break
         
-        # Provider AD ask if he is the winner
-        am_i_winner = CheckWinner(service_id)
-        if am_i_winner == True:
+#         # Provider AD ask if he is the winner
+#         am_i_winner = CheckWinner(service_id)
+#         if am_i_winner == True:
             
-            # Start deployment of the requested federated service
-            t_deploymentStart = time.time() - process_start_time
-            data.append(['deploymentStart', t_deploymentStart])
+#             # Start deployment of the requested federated service
+#             t_deploymentStart = time.time() - process_start_time
+#             data.append(['deploymentStart', t_deploymentStart])
 
-            # Deployment of the NSI in OSM...
-            nsi_id = create_nsi("federated_service", True)
+#             # Deployment of the NSI in OSM...
+#             nsi_id = create_nsi("federated_service", True)
 
 
-            # IP address of the service deployed by the provider
-            external_ip = get_service_deployed_info()
+#             # IP address of the service deployed by the provider
+#             external_ip = get_service_deployed_info()
 
-            # Deployment finished
-            t_deploymentFinished = time.time() - process_start_time
-            data.append(['deploymentFinished', t_deploymentFinished])
+#             # Deployment finished
+#             t_deploymentFinished = time.time() - process_start_time
+#             data.append(['deploymentFinished', t_deploymentFinished])
             
     
-            # Deployment confirmation sent
-            t_confirmDeploymentSent = time.time() - process_start_time
-            data.append(['confirmDeploymentSent', t_confirmDeploymentSent])
-            ServiceDeployed(service_id, external_ip)
+#             # Deployment confirmation sent
+#             t_confirmDeploymentSent = time.time() - process_start_time
+#             data.append(['confirmDeploymentSent', t_confirmDeploymentSent])
+#             ServiceDeployed(service_id, external_ip)
             
-            print("\n\033[1;32m(TX-4) Service deployed\033[0m")
-            print("External IP:", external_ip)
-            DisplayServiceState(service_id)
+#             print("\n\033[1;32m(TX-4) Service deployed\033[0m")
+#             print("External IP:", external_ip)
+#             DisplayServiceState(service_id)
             
-            # Export the data to a csv file
-            create_csv_file('federation_private_network_provider.csv', header, data)
+#             # Export the data to a csv file
+#             create_csv_file('federation_private_network_provider.csv', header, data)
             
-            return {"message": "Federation process (which involves announcement offer, negotiation and acceptance) successful"}
+#             return {"message": "Federation process (which involves announcement offer, negotiation and acceptance) successful"}
 
-        else:
-            print("I am not a Winner")
-            return {"error": "I am not a Winner"}
+#         else:
+#             print("I am not a Winner")
+#             return {"error": "I am not a Winner"}
 
-    else:
-        return {"error": "You must be provider to run this code"}
+#     else:
+#         return {"error": "You must be provider to run this code"}
 # ------------------------------------------------------------------------------------------------------------------------------#
 
 

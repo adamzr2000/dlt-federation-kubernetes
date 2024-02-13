@@ -1,1 +1,5 @@
 web3==5.31.3
+eth-hash>=0.3.1,<0.4.0
+fastapi[all]
+kubernetes
+python-dotenv

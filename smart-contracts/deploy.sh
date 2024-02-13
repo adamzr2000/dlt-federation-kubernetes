@@ -12,5 +12,3 @@ docker run \
   --network host \
   -v $(pwd)/.:/smart-contracts \
   truffle:latest 
-
-#$START_CMD
