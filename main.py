@@ -100,6 +100,8 @@ block_address = os.getenv(f'ETHERBASE_NODE_{"1" if domain == "consumer" else "2"
 
 # General setup
 ip_address = os.popen('ip a | grep 10.5.50').read().split('inet ', 1)[1].split('/', 1)[0]
+
+# Number that is used to prevent transaction replay attacks and ensure the order of transactions.
 nonce = web3.eth.getTransactionCount(block_address)
 
 # Address of the miner (node that adds a block to the blockchain)
@@ -153,13 +155,29 @@ federation_step_times = []
 domain_registered = False
 
 def send_signed_transaction(build_transaction):
+    """
+    Sends a signed transaction to the blockchain network using the private key.
+    
+    Args:
+        build_transaction (dict): The transaction data to be sent.
+    
+    Returns:
+        str: The transaction hash of the sent transaction.
+    """
+    global nonce
+    # Sign the transaction
     signed_txn = web3.eth.account.signTransaction(build_transaction, private_key)
-    return web3.eth.sendRawTransaction(signed_txn.rawTransaction)
+
+    # Send the signed transaction
+    tx_hash = web3.eth.sendRawTransaction(signed_txn.rawTransaction)
+
+    # Increment the nonce
+    nonce += 1
+
+    return tx_hash
 
 # Consumer AD announces that he needs a federated service and reveals his ip address (192.168.56.104)
 def AnnounceService():
-    global nonce
-
     # Build the transaction for the AnnounceService function
     announce_transaction = Federation_contract.functions.AnnounceService(
         _requirements=web3.toBytes(text=service_requirements),
@@ -172,9 +190,6 @@ def AnnounceService():
     
     # Send the signed transaction
     tx_hash = send_signed_transaction(announce_transaction)
-    
-    # Increment the nonce
-    nonce += 1
     
     block = web3.eth.getBlock('latest')
     block_number = block['number']
@@ -190,7 +205,6 @@ def GetBidInfo(bid_index):
 
 # Consumer AD choose a Provider (indicates the bid index)
 def ChooseProvider(bid_index):
-    global nonce
 
     # Build the transaction for the ChooseProvider function
     choose_transaction = Federation_contract.functions.ChooseProvider(
@@ -203,7 +217,6 @@ def ChooseProvider(bid_index):
 
     # Send the signed transaction
     tx_hash = send_signed_transaction(choose_transaction)
-    nonce += 1
 
 # Returns information about the service (0->Open, 1->Closed, 2->Deployed)
 def GetServiceState(serviceid):
@@ -232,7 +245,6 @@ def ServiceAnnouncementEvent():
 
 # Providers analyze the requirements and place a bid offer to the Federation SC
 def PlaceBid(service_id, service_price):
-    global nonce
     # Build the transaction for the PlaceBid function
     place_bid_transaction = Federation_contract.functions.PlaceBid(
         _id=web3.toBytes(text=service_id),
@@ -245,7 +257,6 @@ def PlaceBid(service_id, service_price):
 
     # Send the signed transaction
     tx_hash = send_signed_transaction(place_bid_transaction)
-    nonce += 1
 
     block = web3.eth.getBlock('latest')
     block_number = block['number']
@@ -267,7 +278,6 @@ def CheckWinner(service_id):
 # Provider AD confirms the operation by sending transaction to the Federation SC.
 # The Federation SC records the successful deployment and initiates charging for the federated service
 def ServiceDeployed(service_id, external_ip):
-    global nonce
     # Build the transaction for the ServiceDeployed function
     service_deployed_transaction = Federation_contract.functions.ServiceDeployed(
         info=web3.toBytes(text=external_ip),
@@ -279,7 +289,6 @@ def ServiceDeployed(service_id, external_ip):
 
     # Send the signed transaction
     tx_hash = send_signed_transaction(service_deployed_transaction)
-    nonce += 1
 
 def DisplayServiceState(serviceID):
     current_service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=serviceID)).call()
@@ -342,7 +351,6 @@ This function registers a domain in the smart contract by calling the addOperato
 """)
 def register_domain():
     global domain_registered  
-    global nonce
     if domain_registered == False:
         
         # Build the transaction for the addOperator function
@@ -353,7 +361,6 @@ def register_domain():
 
         # Send the signed transaction
         tx_hash = send_signed_transaction(add_operator_transaction)
-        nonce += 1
 
         domain_registered = True
         print("\n\033[1;32m(TX) Domain has been registered\033[0m")
