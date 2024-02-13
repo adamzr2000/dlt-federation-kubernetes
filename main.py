@@ -7,12 +7,29 @@ from web3.middleware import geth_poa_middleware
 from fastapi import FastAPI
 
 
+# Define your tags
+tags_metadata = [
+    {
+        "name": "Default DLT Functions",
+        "description": "General DLT operations that are applicable to both consumers and providers.",
+    },
+    {
+        "name": "Consumer Functions",
+        "description": "Operations specifically designed for consumers in the DLT network.",
+    },
+    {
+        "name": "Provider Functions",
+        "description": "Operations specifically designed for providers in the DLT network.",
+    },
+]
+
 app = FastAPI(
     title="DLT Federation with K8s API Documentation",
+    openapi_tags=tags_metadata,
     description="""
-- This API provides endpoints for interacting with the DLT network.
+- This API provides endpoints for interacting with the DLT network and Kubernetes orchestrator.
 
-- The federation procedures are stored and deployed on a Federation Smart Contract, which is running on top of a private blockchain network.
+- The federation procedures are stored and deployed on a Federation Smart Contract, which is running on top of a private blockchain network (Ethereum).
 
 - ADs communicate with the smart contract through transactions.
 
@@ -43,6 +60,8 @@ Provider AD starts the deployment of the requested federated service
 Once the provider deploys the federated service, it notifies the consumer AD
 """
 )
+
+
 
 # Initial setup: Determine domain and load environment variables
 domain = input("Domain function (consumer/provider): ").strip().lower()
@@ -85,6 +104,21 @@ nonce = web3.eth.getTransactionCount(block_address)
 
 # Address of the miner (node that adds a block to the blockchain)
 coinbase = block_address
+
+# Initialize variables
+service_id = ''
+service_endpoint_consumer = ''
+service_consumer_address = ''
+service_requirements = ''
+bids_event = None
+service_endpoint_provider = ''
+federated_host = ''
+service_price = 0
+bid_index = 0
+winner = coinbase
+manager_address = ''
+winnerChosen_event = None
+service_endpoint = ''
 
 # Initialize domain-specific configurations and variables
 if domain == "consumer":
@@ -289,15 +323,11 @@ summary="Web3 and Ethereum node info",
 tags=["Default DLT Functions"],
 description="Get detailed information about the Web3 connection and Ethereum node")
 def web3_info():
-    print('\nAccounts:',eth_address)
-    print("\nEtherbase:", coinbase)
-    print("\n\033[1m" + "IP address: " + str(ipaddress) + "\033[0m")
+    print("\n\033[1m" + "IP address: " + str(ip_address) + "\033[0m")
     print("\033[1m" + "Ethereum address: " + str(block_address) + "\033[0m")
     print("Federation contract:\n", Federation_contract.functions)
     message = {
-        "Accounts": eth_address,
-        "Miner address": coinbase,
-        "IP address": ipaddress,
+        "IP address": ip_address,
         "Ethereum address": block_address,
         "Contract address": contract_address,
         "Domain name": domain_name,

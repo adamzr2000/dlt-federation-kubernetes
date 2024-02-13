@@ -1,11 +1,2 @@
 __pycache__/
-contracts/build/
-descriptors/nginx_knf.tar.gz
-descriptors/nginx_ns.tar.gz
-descriptors/openldap_knf.tar.gz
-descriptors/openldap_ns.tar.gz
-descriptors/squid_metrics_cnf.tar.gz
-descriptors/squid_metrics_cnf_ns.tar.gz
 
-federation_private_network_consumer.csv
-federation_private_network_provider.csv

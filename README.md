@@ -1,77 +1,63 @@
 # DLT Federation with K8s
 
-Short description...
+## Prerequisites
+
+Before getting started, make sure you have the following installed on your system:
+
+- [Microk8s](https://microk8s.io/#install-microk8s)
+- [Docker](https://docs.docker.com/engine/install/ubuntu)
+- [Docker Compose](https://docs.docker.com/compose/install/linux)
 
 ## Installation
 
 1. Clone the repository:
 ```
-git clone https://github.com/adamzr2000/federation_osm_k8s.git
+git clone git@github.com:adamzr2000/dlt-federation-kubernetes.git
 ```
-2. Initialize the virtual environment:
+2. Build Docker Images:
+Follow these steps to build the necessary Docker images:
+
+2.1. Navigate to the `docker-images` directory in your project.
+```bash
+cd docker-images
 ```
-cd federation_osm_k8s
-source fastapi-env/bin/activate
+2.2. For each of the following subdirectories (`dlt-node`, `truffle`), execute the `build.sh` script. Example:
+```bash
+cd ../dlt-node
+./build.sh
+cd ../truffle
+./build.sh
 ```
-3. Install the necessary dependencies:
-```
+
+3. Install the necessary python3 dependencies:
+```bash
 pip install -r requirements.txt
-```
-4. Install nodejs (if you don't have it yet): [How to Install Node.js on Ubuntu 20.04](https://www.digitalocean.com/community/tutorials/how-to-install-node-js-on-ubuntu-20-04)
-
-5. Install truffle:
-```
-npm install -g truffle
-```
-6. Install Ganache GUI: [How to Install Ganache](https://trufflesuite.com/ganache/)
-
-*If you don't have a computer with a graphical interface you can install Ganache CLI*
-```
-npm install -g ganache-cli
 ```
 
 ## Usage 
 
-1. Create a local Blockchain Network (e.g. Ganache, Hyperledger)
+1. Create a private Blockchain Network (Ethereum Network based on container Geth nodes)
 
 *Both VMs must have access to blockchain nodes of this network (10.5.50.X/16)*
 
-*Use the mnemonic "netcom;"*
-
-- If you are using Ganache GUI: start a server on *https://10.5.50.100:7545*
-
-- If you are using Ganache CLI:
-```
-ganache-cli --host 10.5.50.100 --port 7545 --mnemonic "netcom;"
+```bash
+./start_dlt_network.sh
 ```
 
 2. Deploy the Federation Smart Contract to the Blockchain Network:
+```bash
+cd smart-contracts
+./deploy.sh 
 ```
-cd contracts
-truffle migrate 
+
+3. Start the web server of the API 
+```bash
+./start_app.sh
 ```
-3. Initialize the virtual environment
-```
-source fastapi-env/bin/activate
-```
-4. Start the web server of the API (By default, it runs on localhost, port 8000)
-```
-uvicorn main:app --reload
-```
-- Consumer VM
-```
-uvicorn main:app --reload --host 10.5.50.100 --port 8000
-uvicorn main_geth:app --reload --host 10.5.50.100 --port 8000
-uvicorn main_public:app --reload --host 10.5.50.100 --port 8000
-```
-Access the API documentation at: [http://10.5.50.100/docs](http://10.5.50.100:8000/docs)
-- Provider VM
-```
-uvicorn main:app --reload --host 10.5.50.101 --port 8002 
-uvicorn main_geth:app --reload --host 10.5.50.101 --port 8002
-uvicorn main_public:app --reload --host 10.5.50.101 --port 8002
-```
-Access the API documentation at: [http://10.5.50.101:8002/docs](http://10.5.50.101:8002/docs)
+
+Access the API documentation at: [http://10.5.50.70:8000/docs](http://10.5.50.70:8000/docs)
+Access the API documentation at: [http://10.5.50.71:8000/docs](http://10.5.50.71:8000/docs)
+
 
 ## Kubernetes configuration
 
