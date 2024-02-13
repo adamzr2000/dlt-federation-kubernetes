@@ -121,6 +121,7 @@ winner = coinbase
 manager_address = ''
 winnerChosen_event = None
 service_endpoint = ''
+domain_registered = False
 
 # Initialize domain-specific configurations and variables
 if domain == "consumer":
@@ -146,13 +147,10 @@ else:  # Provider
 
 print(f"Configuration complete for {domain_name} with IP {service_endpoint}.")
 
-#-------------------------- Configure TEST variables ------------------------------#
-# Initialize a list to store the times of each federation step
+#-------------------------- Initialize TEST variables ------------------------------#
+# List to store the timestamps of each federation step
 federation_step_times = []
 #----------------------------------------------------------------------------------#
-
-# Configure the domain variables
-domain_registered = False
 
 def send_signed_transaction(build_transaction):
     """
@@ -176,9 +174,14 @@ def send_signed_transaction(build_transaction):
 
     return tx_hash
 
-# Consumer AD announces that he needs a federated service and reveals his ip address (192.168.56.104)
 def AnnounceService():
-    # Build the transaction for the AnnounceService function
+    """
+    Consumer AD announces the need for a federated service. 
+    This transaction includes the service requirements, consumer's endpoint, and a unique service identifier.
+    
+    Returns:
+        Filter: A filter for catching the 'NewBid' event that is emitted when a new bid is placed for the announced service.
+    """
     announce_transaction = Federation_contract.functions.AnnounceService(
         _requirements=web3.toBytes(text=service_requirements),
         _endpoint_consumer=web3.toBytes(text=service_endpoint_consumer),
@@ -198,15 +201,26 @@ def AnnounceService():
     
     return event_filter
 
-# Returns information about a specific bid (indicates the bid index)
 def GetBidInfo(bid_index):
+    """
+    Consumer AD retrieves information about a specific bid based on its index.
+    
+    Args:
+        bid_index (int): The index of the bid for which information is requested.
+    
+    Returns:
+        tuple: Contains information about the bid.
+    """
     bid_info = Federation_contract.functions.GetBid(_id=web3.toBytes(text=service_id), bider_index=bid_index, _creator=block_address).call()
     return bid_info
 
-# Consumer AD choose a Provider (indicates the bid index)
 def ChooseProvider(bid_index):
-
-    # Build the transaction for the ChooseProvider function
+    """
+    Consumer AD chooses a provider from the list of bids based on the bid index. 
+    
+    Args:
+        bid_index (int): The index of the bid that identifies the chosen provider.
+    """
     choose_transaction = Federation_contract.functions.ChooseProvider(
         _id=web3.toBytes(text=service_id),
         bider_index=bid_index
@@ -218,13 +232,29 @@ def ChooseProvider(bid_index):
     # Send the signed transaction
     tx_hash = send_signed_transaction(choose_transaction)
 
-# Returns information about the service (0->Open, 1->Closed, 2->Deployed)
 def GetServiceState(serviceid):
+    """
+    Returns the current state of the service identified by the service ID.
+    
+    Args:
+        serviceid (str): The unique identifier of the service.
+    
+    Returns:
+        int: The state of the service (0 for Open, 1 for Closed, 2 for Deployed).
+    """    
     service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=serviceid)).call()
     return service_state
 
-# Returns the IP of the Provider
 def GetDeployedInfo(service_id):
+    """
+    Consumer AD retrieves the deployment information of a service, including the service ID, provider's endpoint, and external IP (exposed IP for the federated service).
+    
+    Args:
+        service_id (str): The unique identifier of the service.
+    
+    Returns:
+        tuple: Contains the external IP and provider's endpoint of the deployed service.
+    """    
     #service_endpoint_provider = '192.168.191.x'
     #service_id, service_endpoint_provider, external_ip = Federation_contract.functions.GetServiceInfo(_id=web3.toBytes(text=serviceid), provider=False, call_address=block_address).call()
     service_id_bytes = web3.toBytes(text=service_id)  # Convert string to bytes
@@ -236,6 +266,13 @@ def GetDeployedInfo(service_id):
     #return service_endpoint_provider
 
 def ServiceAnnouncementEvent():
+    """
+    Creates a filter to catch the 'ServiceAnnouncement' event emitted when a service is announced. This function
+    can be used to monitor new service announcements in real-time.
+    
+    Returns:
+        Filter: A filter for catching the 'ServiceAnnouncement' event.
+    """    
     block = web3.eth.getBlock('latest')
     blocknumber = block['number']
     print("\nLatest block:",blocknumber)
@@ -243,9 +280,18 @@ def ServiceAnnouncementEvent():
     return event_filter
 
 
-# Providers analyze the requirements and place a bid offer to the Federation SC
 def PlaceBid(service_id, service_price):
-    # Build the transaction for the PlaceBid function
+    """
+    Provider AD places a bid offer for a service, including the service ID, offered price, and provider's endpoint.
+    
+    Args:
+        service_id (str): The unique identifier of the service for which the bid is placed.
+        service_price (int): The price offered for providing the service.
+    
+    Returns:
+        Filter: A filter for catching the 'ServiceAnnouncementClosed' event that is emitted when a service
+                announcement is closed.
+    """
     place_bid_transaction = Federation_contract.functions.PlaceBid(
         _id=web3.toBytes(text=service_id),
         _price=service_price,
@@ -266,8 +312,16 @@ def PlaceBid(service_id, service_price):
 
     return event_filter
 
-# Returns True if the consumer has choosen a provider and False in other cases ***
 def CheckWinner(service_id):
+    """
+    Checks if the caller is the winning provider for a specific service after the consumer has chosen a provider.
+    
+    Args:
+        service_id (str): The unique identifier of the service.
+    
+    Returns:
+        bool: True if the caller is the winning provider, False otherwise.
+    """
     state = GetServiceState(service_id)
     result = False
     if state == 1:
@@ -275,10 +329,16 @@ def CheckWinner(service_id):
         print("Am I a Winner? ", result)
     return result
 
-# Provider AD confirms the operation by sending transaction to the Federation SC.
-# The Federation SC records the successful deployment and initiates charging for the federated service
+
 def ServiceDeployed(service_id, external_ip):
-    # Build the transaction for the ServiceDeployed function
+    """
+    Provider AD confirms the operation of a service deployment.
+    This transaction includes the external IP and the service ID, and it records the successful deployment.
+    
+    Args:
+        service_id (str): The unique identifier of the service.
+        external_ip (str): The external IP address for the deployed service (~ exposed IP).
+    """
     service_deployed_transaction = Federation_contract.functions.ServiceDeployed(
         info=web3.toBytes(text=external_ip),
         _id=web3.toBytes(text=service_id)
@@ -291,6 +351,12 @@ def ServiceDeployed(service_id, external_ip):
     tx_hash = send_signed_transaction(service_deployed_transaction)
 
 def DisplayServiceState(serviceID):
+    """
+    Displays the current state of a service based on its ID. The state is printed to the console.
+    
+    Args:
+        serviceID (str): The unique identifier of the service.
+    """    
     current_service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=serviceID)).call()
     if current_service_state == 0:
         print("\nService state", "Open")
@@ -336,13 +402,13 @@ def web3_info():
     print("\033[1m" + "Ethereum address: " + str(block_address) + "\033[0m")
     print("Federation contract:\n", Federation_contract.functions)
     message = {
-        "IP address": ip_address,
-        "Ethereum address": block_address,
-        "Contract address": contract_address,
-        "Domain name": domain_name,
-        "Service ID": service_id
+        "ip-address": ip_address,
+        "ethereum-address": block_address,
+        "contract-address": contract_address,
+        "domain-name": domain_name,
+        "service-id": service_id
     }
-    return {"Web3 info": message}
+    return {"web3-info": message}
 
 @app.post("/register_domain",
 tags=["Default DLT Functions"],
@@ -391,13 +457,13 @@ If the state is 0, it means the service is open, 1 means the service is closed, 
 def check_service_state(service_id: str):
     current_service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=service_id)).call()
     if current_service_state == 0:
-        return {"Service ID": service_id, "State": "Open"}
+        return {"service-id": service_id, "state": "open"}
     elif current_service_state == 1:
-        return {"Service ID": service_id, "State": "Closed"}
+        return {"service-id": service_id, "state": "closed"}
     elif current_service_state == 2:
-        return {"Service ID": service_id, "State": "Deployed"}
+        return {"service-id": service_id, "state": "deployed"}
     else:
-        return { "Error" : f"Service ID {service_id}, state is {current_service_state}"}
+        return { "error" : f"service-id {service_id}, state is {current_service_state}"}
     
 
 @app.get("/check_deployed_info/{service_id}", tags=["Default DLT Functions"])
@@ -407,7 +473,7 @@ def check_deployed_info(service_id: str):
     _service_id = service_id.rstrip(b'\x00')  # Apply rstrip on bytes-like object
     _service_endpoint_provider = service_endpoint_provider.rstrip(b'\x00')
     _external_ip = external_ip.rstrip(b'\x00')
-    return {"Service ID": _service_id, "Service endpoint provider": _service_endpoint_provider, "External IP": _external_ip}
+    return {"service-id": _service_id, "service-endpoint-provider": _service_endpoint_provider, "external-ip": _external_ip}
 
 
 @app.get("/check_service_announcements", 
@@ -438,11 +504,11 @@ def check_service_announcements():
     
     if len(open_services) > 0:
         message = {
-            "Service ID": service_id,
-            "Requirements": requirements,
-            "TX HASH": tx_hash,
-            "Contract address": address,
-            "Block": block_number
+            "service-id": service_id,
+            "requirements": requirements,
+            "tx-hash": tx_hash,
+            "contract-address": address,
+            "block": block_number
         }
         print('Announcement received:')
         print(new_events)
@@ -461,7 +527,7 @@ def place_bid(service_id: str, service_price: int):
     global winnerChosen_event 
     winnerChosen_event  = PlaceBid(service_id, service_price)
     print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
-    return {"Transaction": "Bid offer sent to the Smart Contract", "Price(₿)": service_price, "From": f"{domain_name} - {block_address}"}
+    return {"Transaction": "Bid offer sent to the Smart Contract", "price(₿)": service_price, "from": block_address}
 
 
 @app.get('/check_bids/{service_id}', tags=["Consumer Functions"],
@@ -487,13 +553,13 @@ def check_bids(service_id: str):
             bid_info = GetBidInfo(int(bid_index-1))
             print(bid_info)
             message = {
-                "Provider address": bid_info[0],
-                "Service price": bid_info[1],
-                "Bid index": bid_info[2]
+                "provider-address": bid_info[0],
+                "service-price": bid_info[1],
+                "bid-index": bid_info[2]
             }
             break
     if bidderArrived:
-        return {"message": f"There are new bids for the service {service_id}", "Bid info": message}
+        return {"message": f"There are new bids for the service {service_id}", "bid-info": message}
 
     else:
         return {"message": f"There are no bids yet for the service {service_id}"}
@@ -512,7 +578,7 @@ def choose_provider(bid_index: int):
         print("\n\033[1;32m(TX-3) Provider choosen! (bid index=" + str(bid_index) + ")\033[0m")
         ChooseProvider(bid_index)
         # Service closed (state 1)
-    return {"Transaction": f"Provider choosen!", "Service ID": event_id, "Bid index": bid_index}    
+    return {"Transaction": f"Provider choosen!", "service-id": event_id, "bid-index": bid_index}    
 
 
 @app.get("/check_winner/{service_id}", tags=["Provider Functions"],
@@ -566,12 +632,12 @@ def deploy_service(service_id: str):
         federated_nsi_id = create_nsi(federated_ns_name, True)
         #federated_nsi_id = 5
         federated_nsi_info = {
-            "Name": federated_ns_name,
-            "ID":  federated_nsi_id
+            "name": federated_ns_name,
+            "id":  federated_nsi_id
         }
         ServiceDeployed(service_id, ipaddress)
         print("\n\033[1;32m(TX-4) Service deployed\033[0m")
-        return {"Transaction": "Service deployed", "Service Info": federated_nsi_info}
+        return {"Transaction": "Service deployed", "service-info": federated_nsi_info}
     else:
         return {"Error": "You are not the winner"}   
 # ------------------------------------------------------------------------------------------------------------------------------#
