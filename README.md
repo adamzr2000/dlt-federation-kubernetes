@@ -55,8 +55,10 @@ cd smart-contracts
 ./start_app.sh
 ```
 
-Access the API documentation at: [http://10.5.50.70:8000/docs](http://10.5.50.70:8000/docs)
-Access the API documentation at: [http://10.5.50.71:8000/docs](http://10.5.50.71:8000/docs)
+Consumer API documentation at: [http://10.5.50.70:8000/docs](http://10.5.50.70:8000/docs)
+
+
+Provider API documentation at: [http://10.5.50.71:8000/docs](http://10.5.50.71:8000/docs)
 
 
 ## Kubernetes configuration
