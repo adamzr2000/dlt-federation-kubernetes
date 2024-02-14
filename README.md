@@ -63,39 +63,18 @@ Provider API documentation at: [http://10.5.50.71:8000/docs](http://10.5.50.71:8
 
 ## Kubernetes configuration
 
-**Install & Activate Metallb in the K8s cluster:**
+**Activate Metallb in the K8s cluster:**
 
 *MetalLB is an open-source, software-based load balancer solution for Kubernetes clusters. It provides a network load balancing functionality by enabling the assignment of external IP addresses to services running within the cluster* 
 
-1. Install MetalLB: Begin by installing MetalLB on your cluster. You can use *kubectl* to apply the MetalLB manifest from its GitHub repository
-```
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.10.2/manifests/namespace.yaml
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.10.2/manifests/metallb.yaml
-```
-
-2. Configure MetalLB: After installing MetalLB, you need to configure it with the appropriate address pool. Create a *config.yaml* file using your preferred text editor:
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  namespace: metallb-system
-  name: config
-data:
-  config: |
-    address-pools:
-    - name: default
-      protocol: layer2
-      addresses:
-      - <YOUR_DESIRED_IP_RANGE>
-```
-
-Replace *<YOUR_DESIRED_IP_RANGE>* with the IP range you want MetalLB to assign services from. For example, you can use a range within your local network, such as *10.5.50.180-10.5.50.190*. Save the file.
-
-3. Apply the configuration:
+1. Configure MetalLB: After installing Microk8s, you need to configure metallb with the appropriate address pool.
 ```bash
-kubectl apply -f config.yaml
+microk8s enable metallb
+
+<Enter each IP address range (e.g. 10.5.50.80-10.5.50.90)>
 ```
-4. Verify the installation: Use the following commands to check if the MetalLB driver is running:
+
+2. Verify the installation: Use the following commands to check if the MetalLB driver is running:
 ```
 kubectl get pods -n metallb-system
 kubectl get configmap -n metallb-system

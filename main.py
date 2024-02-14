@@ -1,10 +1,14 @@
 import os
 import json
 import time
+import yaml
+
 from dotenv import load_dotenv
 from web3 import Web3, HTTPProvider, WebsocketProvider
 from web3.middleware import geth_poa_middleware
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from kubernetes import client, config
+from kubernetes.client.rest import ApiException
 
 
 # Define your tags
@@ -83,7 +87,7 @@ try:
     if web3.isConnected():
         # Attempt to get the Geth version to confirm a successful connection
         geth_version = web3.clientVersion
-        print(f"Connected to Ethereum node successfully. Geth version: {geth_version}")
+        print(f"Successfully connected to Ethereum node successfully (version={geth_version}")
     else:
         print("Failed to connect to the Ethereum node.")
 except Exception as e:
@@ -132,7 +136,10 @@ if domain == "consumer":
     service_requirements = 'service='
     bids_event = None  # Placeholder for event listener setup
     domain_name = "AD1"
-    # Additional setup or actions for the consumer can be added here
+
+    # Load Kubernetes configuration
+    config.load_kube_config(config_file=os.path.join(os.getcwd(), "k8s-cluster-config", "microk8s-1-config"))
+
 else:  # Provider
     # Provider-specific variables
     service_endpoint_provider = ip_address
@@ -143,9 +150,25 @@ else:  # Provider
     manager_address = ''  # Placeholder for manager contract address
     winnerChosen_event = None  # Placeholder for event listener setup
     domain_name = "AD2"
-    # Additional setup or actions for the provider can be added here
 
-print(f"Configuration complete for {domain_name} with IP {service_endpoint}.")
+    # Load Kubernetes configuration
+    config.load_kube_config(config_file=os.path.join(os.getcwd(), "k8s-cluster-config", "microk8s-2-config"))
+
+print(f"Configuration complete for {domain_name} with IP {ip_address}.")
+
+# CoreV1Api provides access to core components of Kubernetes such as pods, namespaces, and services.
+api_instance_coreV1 = client.CoreV1Api()
+
+# AppsV1Api provides access to functionalities related to deploying and managing applications within Kubernetes. 
+# This includes managing deployments, stateful sets, and other application controllers
+api_instance_appsV1 = client.AppsV1Api()
+
+# Validate connectivity to Kubernetes and get the version information
+try:
+    version_info = client.VersionApi().get_code()
+    print(f"Successfully connected to Kubernetes client API (version={version_info.git_version})")
+except Exception as e:
+    print(f"Failed to connect to Kubernetes client API: {e}")
 
 #-------------------------- Initialize TEST variables ------------------------------#
 # List to store the timestamps of each federation step
@@ -368,26 +391,100 @@ def DisplayServiceState(serviceID):
         print(f"Error: state for service {serviceID} is {current_service_state}")
 
 
-# def get_kubernetes_server_version():
-#     try:
-#         # Load the Kubernetes configuration
-#         config.load_kube_config()
+def create_pod_from_yaml(k8s_api, yaml_file_path):
+    """
+    Creates a Kubernetes pod from a specified YAML file.
 
-#         # Create an instance of the Kubernetes API client
-#         api_client = client.VersionApi()
+    Parameters:
+    - k8s_api: CoreV1Api instance for Kubernetes API interactions.
+    - yaml_file_path: Path to the YAML file containing pod configuration.
 
-#         # Retrieve the server version
-#         api_response = api_client.get_code()
-#         server_version = api_response.git_version
+    Reads pod configuration from the YAML, creates the pod in the specified or default namespace, and prints the pod name.
+    """
+    with open(yaml_file_path, 'r') as file:
+        pod_manifest = yaml.safe_load(file)
 
-#         return server_version
-#     except Exception as e:
-#         print(f"Error occurred: {str(e)}")
-#         return None
+    # Create the pod in the specified namespace (or default if not specified)
+    namespace = pod_manifest.get("metadata", {}).get("namespace", "default")
+    resp = k8s_api.create_namespaced_pod(body=pod_manifest, namespace=namespace)
+
+    print(f"Pod '{resource['metadata']['name']}' created.")
+
+def create_resource_from_yaml(k8s_api, yaml_file_path):
+    """
+    Creates a Kubernetes resource (Service, Deployment, etc.) from a specified YAML file.
+
+    Parameters:
+    - k8s_api: An instance of a Kubernetes API class, such as CoreV1Api or AppsV1Api, depending on the resource type.
+    - yaml_file_path: Path to the YAML file containing the resource configuration.
+
+    Reads the resource configuration from the YAML and creates it in the Kubernetes cluster.
+    """
+    with open(yaml_file_path, 'r') as file:
+        resources = yaml.safe_load_all(file)
+
+    for resource in resources:
+        kind = resource.get("kind")
+        namespace = resource.get("metadata", {}).get("namespace", "default")
+
+        if kind == "Service":
+            resp = k8s_api.create_namespaced_service(body=resource, namespace=namespace)
+            print(f"Service '{resource['metadata']['name']}' created.")
+        elif kind == "Deployment":
+            resp = k8s_api.create_namespaced_deployment(body=resource, namespace=namespace)
+            print(f"Deployment '{resource['metadata']['name']}' created.")
+        else:
+            print(f"Unsupported kind '{kind}' in YAML.")
+
+def delete_pod(k8s_api, pod_name, namespace='default'):
+    """
+    Deletes a specified pod within a given namespace.
+
+    :param k8s_api: CoreV1Api instance of the Kubernetes client.
+    :param pod_name: String name of the pod to delete.
+    :param namespace: String name of the namespace where the pod is located. Defaults to 'default'.
+    """
+    try:
+        # Delete the pod
+        resp = k8s_api.delete_namespaced_pod(name=pod_name,
+                                             namespace=namespace,
+                                             body=client.V1DeleteOptions(),
+                                             grace_period_seconds=0)
+        print(f"Pod '{pod_name}' deleted.")
+        return resp
+    except ApiException as e:
+        if e.status == 404:
+            print(f"Pod '{pod_name}' not found.")
+        else:
+            print(f"Error deleting pod '{pod_name}': {e}")
+        return None
 
 
 # -------------------------------------------- K8S API FUNCTIONS --------------------------------------------#
+@app.post("/create-pod",
+tags=["K8s Functions"])
+async def create_pod_endpoint():
+    """
+    Endpoint to create a Kubernetes pod from a YAML file.
+    """
+    try:
+        yaml_file_path = "./descriptorss/nginx-pod.yaml"
+        create_pod_from_yaml(api_instance_coreV1, yaml_file_path)
+        return {"message": f"Pod creation initiated from {yaml_file_path}."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/delete-pod",
+tags=["K8s Functions"])
+async def delete_pod_endpoint(pod_name: str):
+    """
+    Endpoint to delete a specified Kubernetes pod.
+    """
+    try:
+        delete_pod(api_instance_coreV1, pod_name)
+        return {"message": f"Pod '{pod_name}' deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 # ------------------------------------------------------------------------------------------------------------------------------#
 
 
@@ -397,7 +494,7 @@ def DisplayServiceState(serviceID):
 summary="Web3 and Ethereum node info",
 tags=["Default DLT Functions"],
 description="Get detailed information about the Web3 connection and Ethereum node")
-def web3_info():
+def web3_info_endpoint():
     print("\n\033[1m" + "IP address: " + str(ip_address) + "\033[0m")
     print("\033[1m" + "Ethereum address: " + str(block_address) + "\033[0m")
     print("Federation contract:\n", Federation_contract.functions)
@@ -415,7 +512,7 @@ tags=["Default DLT Functions"],
 description="""
 This function registers a domain in the smart contract by calling the addOperator function
 """)
-def register_domain():
+def register_domain_endpoint():
     global domain_registered  
     if domain_registered == False:
         
@@ -441,7 +538,7 @@ description="""
 Triggered by the consumer domain, once it has beed decided the need of federate part of a service, 
 an announcement is broadcast to all potential provider ADs. The announcement conveys the requirements for a given service.
 """)
-def create_service_announcement():
+def create_service_announcement_endpoint():
     global bids_event
     bids_event = AnnounceService()
     print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
@@ -454,7 +551,7 @@ description="""
 This function retrieves the current state of a service specified by its ID by calling the GetServiceState function of the smart contract. 
 If the state is 0, it means the service is open, 1 means the service is closed, and 2 means the service has been deployed
 """)
-def check_service_state(service_id: str):
+def check_service_state_endpoint(service_id: str):
     current_service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=service_id)).call()
     if current_service_state == 0:
         return {"service-id": service_id, "state": "open"}
@@ -467,7 +564,7 @@ def check_service_state(service_id: str):
     
 
 @app.get("/check_deployed_info/{service_id}", tags=["Default DLT Functions"])
-def check_deployed_info(service_id: str):
+def check_deployed_info_endpoint(service_id: str):
     service_id_bytes = web3.toBytes(text=service_id)  # Convert string to bytes
     service_id, service_endpoint_provider, external_ip = Federation_contract.functions.GetServiceInfo(_id=service_id_bytes, provider=False, call_address=block_address).call()
     _service_id = service_id.rstrip(b'\x00')  # Apply rstrip on bytes-like object
@@ -481,7 +578,7 @@ tags=["Provider Functions"],
 description=""" 
 Retrieves new service announcements, checks their state, and returns a JSON response with the details of any open services found or a message indicating no new events. 
 """)
-def check_service_announcements():
+def check_service_announcements_endpoint():
 
     new_service_event = ServiceAnnouncementEvent()
     open_services = []
@@ -523,7 +620,7 @@ description="""
 This function allows a provider to place a bid for a service by providing the service ID and the bid price. 
 It sends the bid offer to the smart contract and returns a JSON response indicating the transaction details.
 """)
-def place_bid(service_id: str, service_price: int):
+def place_bid_endpoint(service_id: str, service_price: int):
     global winnerChosen_event 
     winnerChosen_event  = PlaceBid(service_id, service_price)
     print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
@@ -535,7 +632,7 @@ description="""
 This function allows a consumer to check for new bids for a specific service by providing the service ID. 
 It retrieves the new bid events, checks for the highest bid index, and returns a JSON response with the bid information if any new bids are found
 """)
-def check_bids(service_id: str):
+def check_bids_endpoint(service_id: str):
     global bids_event
     message = ""
     new_events = bids_event.get_all_entries()
@@ -570,7 +667,7 @@ description="""
 This function allows a consumer to choose a provider for a service by specifying the bid index. 
 It retrieves the bid events, chooses the provider associated with the specified bid index, and returns a JSON response indicating the transaction details.
 """)
-def choose_provider(bid_index: int):
+def choose_provider_endpoint(bid_index: int):
     global bids_event
     new_events = bids_event.get_all_entries()
     for event in new_events:
@@ -585,7 +682,7 @@ def choose_provider(bid_index: int):
 description="""
 Ths function allows a provider to check if there is a winner for a specific service by providing the service ID. 
 """)
-def check_winner(service_id: str):
+def check_winner_endpoint(service_id: str):
     global winnerChosen_event 
 
     new_events = winnerChosen_event.get_all_entries()
@@ -609,7 +706,7 @@ def check_winner(service_id: str):
 description="""
 Ths function allows a provider to check if he is the winner for a specific service by providing the service ID. 
 """)
-def check_if_I_am_Winner(service_id: str):
+def check_if_I_am_Winner_endpoint(service_id: str):
      # Provider AD ask if he is the winner
     am_i_winner = CheckWinner(service_id)
     if am_i_winner == True:
@@ -625,7 +722,7 @@ description="""
 Provider AD starts the deployment of the requested federated service. Once it has been deployed, he confirms the operation by sending transaction to the smart contract.
 The smart contract records the successful deployment and initiates charging for the federated service
 """)
-def deploy_service(service_id: str):
+def deploy_service_endpoint(service_id: str):
     if CheckWinner(service_id):
 
         federated_ns_name = "federated_service"
