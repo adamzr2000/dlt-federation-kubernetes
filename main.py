@@ -614,40 +614,52 @@ def check_deployed_info_endpoint(service_id: str):
          tags=["Provider Functions"], 
          description="Endpoint to check for new announcements")
 def check_service_announcements_endpoint():
-    new_service_event = ServiceAnnouncementEvent()
-    open_services = []
-    new_events = new_service_event.get_all_entries()
+    new_service_event = contract.events.ServiceAnnouncement()  # Replace ServiceAnnouncementEvent() with the actual event
 
+    # Determine the current block number
+    current_block = web3.eth.blockNumber
+
+    # Calculate the start block for the event search (last 20 blocks)
+    start_block = max(0, current_block - 20)  # Ensure start block is not negative
+
+    # Fetch new events from the last 20 blocks
+    new_events = new_service_event.createFilter(fromBlock=start_block, toBlock='latest').get_all_entries()
+
+    open_services = []
     message = ""
+
     for event in new_events:
         service_id = web3.toText(event['args']['id']).rstrip('\x00')
         requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
         tx_hash = web3.toHex(event['transactionHash'])
-        address =  event['address']
+        address = event['address']
         block_number = event['blockNumber']
+
         if 'event' in event['args']:
             event_name = web3.toText(event['args']['event'])
         else:
             event_name = ""
 
+        # Assuming GetServiceState is a function you've defined that checks the state of a service
         if GetServiceState(service_id) == 0:
-            open_services.append(service_id)
-    
-    if len(open_services) > 0:
-        message = {
-            "service-id": service_id,
-            "requirements": requirements,
-            "tx-hash": tx_hash,
-            "contract-address": address,
-            "block": block_number
-        }
-        print('Announcement received:')
-        print(new_events)
+            service_details = {
+                "service_id": service_id,
+                "requirements": requirements,
+                "tx_hash": tx_hash,
+                "contract_address": address,
+                "block": block_number,
+                "event_name": event_name
+            }
+            open_services.append(service_details)
 
-        return {"Announcement received": message}
+    if len(open_services) > 0:
+        print('Announcement received:')
+        for service in open_services:
+            print(service)
+        return {"Announcements": open_services}
     else:
-        return {"No new events found": message}
-        
+        return {"No new events found": "No new services announced in the last 20 blocks."}
+
 
 @app.post("/place_bid/{service_id}-{service_price}",
           summary="Place a bid",
@@ -778,230 +790,4 @@ def deploy_service_endpoint(service_id: str):
 
 
 # -------------------------------------------- TEST DEPLOYMENT: DLT WITH OSM-K8s --------------------------------------------#
-# @app.get("/consumer_code", tags=["Test deployment: federation of a K8s service in OSM"])
-# def consumer_code():
-
-#     header = ['step', 'timestamp']
-#     data = []
-    
-#     if domain == 'consumer':
-        
-#         # Start time of the process
-#         process_start_time = time.time()
-        
-#         global bids_event
-
-#         # Consumer creates a Network Service Instance composed of 1 KNF (Kubernetes Network Function)
-#         #nsi_id = create_nsi("test", True)
-       
-#         print("\nSERVICE_ID:", service_id) # service + timestamp
-        
-#         # Service Announcement Sent
-#         t_serviceAnnouncementSent = time.time() - process_start_time
-#         data.append(['serviceAnnouncementSent', t_serviceAnnouncementSent])
-#         bids_event = AnnounceService()
-
-#         print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
-
-#         # Consumer AD wait for provider bids
-#         bidderArrived = False
-
-#         print("Waiting for bids...\n")
-#         while bidderArrived == False:
-#             new_events = bids_event.get_all_entries()
-#             for event in new_events:
-                
-#                 # Bid Offer Received
-#                 t_bidOfferReceived = time.time() - process_start_time
-#                 data.append(['bidOfferReceived', t_bidOfferReceived])
-
-#                 event_id = str(web3.toText(event['args']['_id']))
-                
-#                 # Choosing provider
-#                 t_choosingProvider = time.time() - process_start_time
-#                 data.append(['choosingProvider', t_choosingProvider])
-
-#                 # service id, service id, index of the bid
-#                 print(service_id, web3.toText(event['args']['_id']), event['args']['max_bid_index'])
-#                 print("BIDS ENTERED")
-#                 bid_index = int(event['args']['max_bid_index'])
-#                 bidderArrived = True 
-#                 if int(bid_index) < 2:
-
-#                     #print("\nBids-info = [provider address , service price , bid index]\n")
-#                     bid_info = GetBidInfo(int(bid_index-1))
-#                     print(bid_info)
-                    
-#                     # Provider choosen
-#                     t_providerChoosen = time.time() - process_start_time
-#                     data.append(['providerChoosen', t_providerChoosen])
-#                     ChooseProvider(int(bid_index)-1)
-
-#                     # Winner choosen sent
-#                     t_winnerChoosenSent = t_providerChoosen
-#                     data.append(['winnerChoosenSent', t_winnerChoosenSent])
-
-#                     print("\n\033[1;32m(TX-3) Provider choosen! (bid index=" + str(bid_index-1) + ")\033[0m")
-
-#                     # Service closed (state 1)
-#                     #DisplayServiceState(service_id)
-#                     break
-
-#         # Consumer AD wait for provider confirmation
-#         serviceDeployed = False 
-#         while serviceDeployed == False:
-#             serviceDeployed = True if GetServiceState(service_id) == 2 else False
-        
-#         # Confirmation received
-#         t_confirmDeploymentReceived = time.time() - process_start_time
-#         data.append(['confirmDeploymentReceived', t_confirmDeploymentReceived])
-        
-#         t_checkConnectivityFederatedServiceStart = time.time() - process_start_time
-#         data.append(['checkConnectivityFederatedServiceStart', t_checkConnectivityFederatedServiceStart])
-
-#         # Service deployed info
-#         external_ip, service_endpoint_provider = GetDeployedInfo(service_id)
-        
-#         external_ip = external_ip.decode('utf-8')
-#         service_endpoint_provider = service_endpoint_provider.decode('utf-8')
-
-#         print("Service deployed info:")
-#         print("External IP:", external_ip)
-#         print("Service endpoint provider:", service_endpoint_provider)
-
-
-#         # Establish connectivity with the federated service
-#         connected = False
-#         while not connected:
-#             connected, response_content = check_federated_service_connection(external_ip)
-#             if not connected:
-#                 print("Failed to establish connection with the federated service. Retrying...")
-        
-#         t_checkConnectivityFederatedServiceFinished = time.time() - process_start_time
-#         data.append(['checkConnectivityFederatedServiceFinished', t_checkConnectivityFederatedServiceFinished])
-
-#         print("Successfully connected to the federated service")
-#         print(response_content)
-
-#         # Export the data to a csv file
-#         create_csv_file('federation_private_network_consumer.csv', header, data)
-
-#         return {"message": "Federation process (which involves announcement offer, negotiation and acceptance) successful"}
-#     else:
-#         return {"error": "You must be consumer to run this code"}
-
-
-# @app.get("/provider_code", tags=["Test deployment: federation of a K8s service in OSM"])
-# def provider_code():
-    
-#     header = ['step', 'timestamp']
-#     data = []
-    
-#     if domain == 'provider':
-        
-#         # Start time of the process
-#         process_start_time = time.time()
-
-#         global winnerChosen_event 
-#         service_id = ''
-#         print("\nSERVICE_ID:",service_id)
-
-#         newService_event = ServiceAnnouncementEvent()
-#         newService = False
-#         open_services = []
-
-#         # Provider AD wait for service announcements
-#         while newService == False:
-#             new_events = newService_event.get_all_entries()
-#             for event in new_events:
-#                 service_id = web3.toText(event['args']['id'])
-                
-#                 requirements = web3.toText(event['args']['requirements'])
-
-#                 requested_service = requirements.split("=")[1]
-#                 # Removes null characters at the end of the string
-#                 requested_service = requested_service.rstrip('\x00') 
-                
-#                 if GetServiceState(service_id) == 0:
-#                     open_services.append(service_id)
-#             print("OPEN =", len(open_services)) 
-#             if len(open_services) > 0:
-                
-#                 # Announcement received
-#                 t_serviceAnnouncementReceived = time.time() - process_start_time
-#                 data.append(['serviceAnnouncementReceived', t_serviceAnnouncementReceived])
-
-#                 print('Announcement received:')
-#                 print(new_events)
-#                 print("\n\033[1;33mRequested service: " + repr(requested_service) + "\033[0m")
-#                 newService = True
-            
-#         service_id = open_services[-1]
-
-#         # Place a bid offer to the Federation SC
-#         t_bidOfferSent = time.time() - process_start_time
-#         data.append(['bidOfferSent', t_bidOfferSent])
-#         winnerChosen_event = PlaceBid(service_id, 10)
-
-#         print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
-        
-#         # Ask to the Federation SC if there is a winner (wait...)
-    
-#         winnerChosen = False
-#         while winnerChosen == False:
-#             new_events = winnerChosen_event.get_all_entries()
-#             for event in new_events:
-#                 event_serviceid = web3.toText(event['args']['_id'])
-#                 if event_serviceid == service_id:
-                    
-#                     # Winner choosen received
-#                     t_winnerChoosenReceived = time.time() - process_start_time
-#                     data.append(['winnerChoosenReceived', t_winnerChoosenReceived])
-
-#                     winnerChosen = True
-#                     break
-        
-#         # Provider AD ask if he is the winner
-#         am_i_winner = CheckWinner(service_id)
-#         if am_i_winner == True:
-            
-#             # Start deployment of the requested federated service
-#             t_deploymentStart = time.time() - process_start_time
-#             data.append(['deploymentStart', t_deploymentStart])
-
-#             # Deployment of the NSI in OSM...
-#             nsi_id = create_nsi("federated_service", True)
-
-
-#             # IP address of the service deployed by the provider
-#             external_ip = get_service_deployed_info()
-
-#             # Deployment finished
-#             t_deploymentFinished = time.time() - process_start_time
-#             data.append(['deploymentFinished', t_deploymentFinished])
-            
-    
-#             # Deployment confirmation sent
-#             t_confirmDeploymentSent = time.time() - process_start_time
-#             data.append(['confirmDeploymentSent', t_confirmDeploymentSent])
-#             ServiceDeployed(service_id, external_ip)
-            
-#             print("\n\033[1;32m(TX-4) Service deployed\033[0m")
-#             print("External IP:", external_ip)
-#             DisplayServiceState(service_id)
-            
-#             # Export the data to a csv file
-#             create_csv_file('federation_private_network_provider.csv', header, data)
-            
-#             return {"message": "Federation process (which involves announcement offer, negotiation and acceptance) successful"}
-
-#         else:
-#             print("I am not a Winner")
-#             return {"error": "I am not a Winner"}
-
-#     else:
-#         return {"error": "You must be provider to run this code"}
 # ------------------------------------------------------------------------------------------------------------------------------#
-
-
-
