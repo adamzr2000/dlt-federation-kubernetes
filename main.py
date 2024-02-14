@@ -391,58 +391,103 @@ def DisplayServiceState(serviceID):
         print(f"Error: state for service {serviceID} is {current_service_state}")
 
 
-def create_pod_from_yaml(k8s_api, yaml_file_path):
+# def create_pod_from_yaml(k8s_api, yaml_file_path):
+#     """
+#     Creates a Kubernetes pod from a specified YAML file.
+
+#     Parameters:
+#     - k8s_api: CoreV1Api instance for Kubernetes API interactions.
+#     - yaml_file_path: Path to the YAML file containing pod configuration.
+
+#     Reads pod configuration from the YAML, creates the pod in the specified or default namespace, and prints the pod name.
+#     """
+#     try:
+#         with open(yaml_file_path, 'r') as file:
+#             pod_manifest = yaml.safe_load(file)
+#         namespace = pod_manifest.get("metadata", {}).get("namespace", "default")
+#         resp = k8s_api.create_namespaced_pod(body=pod_manifest, namespace=namespace)
+#         print("Pod created:", resp.metadata.name)
+#     except ApiException as e:
+#         print(f"Exception when calling Kubernetes API: {e}")
+#         raise
+
+# def create_service_from_yaml(k8s_api, yaml_file_path):
+#     """
+#     Creates a Kubernetes service from a specified YAML file.
+
+#     Parameters:
+#     - k8s_api: An instance of CoreV1Api for Kubernetes API interactions.
+#     - yaml_file_path: Path to the YAML file containing the service configuration.
+#     """
+#     try:
+#         with open(yaml_file_path, 'r') as file:
+#             service_manifest = yaml.safe_load(file)
+#         resp = k8s_api.create_namespaced_service(body=service_manifest, namespace="default")
+#         print("Service created:", resp.metadata.name)
+#     except ApiException as e:
+#         print(f"Exception when calling Kubernetes API: {e}")
+#         raise
+
+# def create_deployment_from_yaml(k8s_api, yaml_file_path):
+#     """
+#     Creates a Kubernetes deployment from a specified YAML file.
+
+#     Parameters:
+#     - k8s_api: An instance of AppsV1Api for Kubernetes API interactions.
+#     - yaml_file_path: Path to the YAML file containing the deployment configuration.
+#     """
+#     try:
+#         with open(yaml_file_path, 'r') as file:
+#             deployment_manifest = yaml.safe_load(file)
+#         resp = k8s_api.create_namespaced_deployment(body=deployment_manifest, namespace="default")
+#         print("Deployment created:", resp.metadata.name)
+#     except ApiException as e:
+#         print(f"Exception when calling Kubernetes API: {e}")
+#         raise
+
+def create_resource_from_yaml(yaml_file_path):
     """
-    Creates a Kubernetes pod from a specified YAML file.
+    Creates a Kubernetes resource (Pod, Service, Deployment) from a specified YAML file.
 
     Parameters:
-    - k8s_api: CoreV1Api instance for Kubernetes API interactions.
-    - yaml_file_path: Path to the YAML file containing pod configuration.
-
-    Reads pod configuration from the YAML, creates the pod in the specified or default namespace, and prints the pod name.
-    """
-    with open(yaml_file_path, 'r') as file:
-        pod_manifest = yaml.safe_load(file)
-
-    # Create the pod in the specified namespace (or default if not specified)
-    namespace = pod_manifest.get("metadata", {}).get("namespace", "default")
-    resp = k8s_api.create_namespaced_pod(body=pod_manifest, namespace=namespace)
-
-    print(f"Pod '{resource['metadata']['name']}' created.")
-
-def create_resource_from_yaml(k8s_api, yaml_file_path):
-    """
-    Creates a Kubernetes resource (Service, Deployment, etc.) from a specified YAML file.
-
-    Parameters:
-    - k8s_api: An instance of a Kubernetes API class, such as CoreV1Api or AppsV1Api, depending on the resource type.
     - yaml_file_path: Path to the YAML file containing the resource configuration.
-
-    Reads the resource configuration from the YAML and creates it in the Kubernetes cluster.
     """
-    with open(yaml_file_path, 'r') as file:
-        resources = yaml.safe_load_all(file)
+    try:
+        with open(yaml_file_path, 'r') as file:
+            resources = yaml.safe_load_all(file)
+            for resource in resources:
+                kind = resource.get("kind")
+                namespace = resource.get("metadata", {}).get("namespace", "default")
 
-    for resource in resources:
-        kind = resource.get("kind")
-        namespace = resource.get("metadata", {}).get("namespace", "default")
+                # Using dynamic dispatch to call the appropriate function based on the resource kind
+                if kind == "Pod":
+                    resp = client.CoreV1Api().create_namespaced_pod(body=resource, namespace=namespace)
+                elif kind == "Service":
+                    resp = client.CoreV1Api().create_namespaced_service(body=resource, namespace=namespace)
+                elif kind == "Deployment":
+                    resp = client.AppsV1Api().create_namespaced_deployment(body=resource, namespace=namespace)
+                else:
+                    raise ValueError(f"Unsupported resource kind: {kind}")
 
-        if kind == "Service":
-            resp = k8s_api.create_namespaced_service(body=resource, namespace=namespace)
-            print(f"Service '{resource['metadata']['name']}' created.")
-        elif kind == "Deployment":
-            resp = k8s_api.create_namespaced_deployment(body=resource, namespace=namespace)
-            print(f"Deployment '{resource['metadata']['name']}' created.")
-        else:
-            print(f"Unsupported kind '{kind}' in YAML.")
+                print(f"{kind} created: {resp.metadata.name}")
+    except ApiException as e:
+        print(f"Exception when calling Kubernetes API: {e}")
+        raise
+    except ValueError as e:
+        print(e)
+        raise
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise
 
 def delete_pod(k8s_api, pod_name, namespace='default'):
     """
     Deletes a specified pod within a given namespace.
 
-    :param k8s_api: CoreV1Api instance of the Kubernetes client.
-    :param pod_name: String name of the pod to delete.
-    :param namespace: String name of the namespace where the pod is located. Defaults to 'default'.
+    Parameters:
+    - k8s_api: CoreV1Api instance of the Kubernetes client.
+    - pod_name: String name of the pod to delete.
+    - namespace: String name of the namespace where the pod is located. Defaults to 'default'.
     """
     try:
         # Delete the pod
@@ -459,6 +504,29 @@ def delete_pod(k8s_api, pod_name, namespace='default'):
             print(f"Error deleting pod '{pod_name}': {e}")
         return None
 
+def delete_service(k8s_api, service_name, namespace='default'):
+    """
+    Deletes a specified service within a given namespace.
+
+    Parameters:
+    - k8s_api: CoreV1Api instance of the Kubernetes client.
+    - service_name: String name of the service to delete.
+    - namespace: String name of the namespace where the service is located. Defaults to 'default'.
+    """
+    try:
+        # Delete the service
+        resp = k8s_api.delete_namespaced_service(name=service_name,
+                                                 namespace=namespace,
+                                                 body=client.V1DeleteOptions())
+        print(f"Service '{service_name}' deleted.")
+        return resp
+    except ApiException as e:
+        if e.status == 404:
+            print(f"Service '{service_name}' not found.")
+        else:
+            print(f"Error deleting service '{service_name}': {e}")
+        return None
+
 
 # -------------------------------------------- K8S API FUNCTIONS --------------------------------------------#
 @app.post("/create-pod",
@@ -469,7 +537,7 @@ async def create_pod_endpoint():
     """
     try:
         yaml_file_path = "./descriptorss/nginx-pod.yaml"
-        create_pod_from_yaml(api_instance_coreV1, yaml_file_path)
+        create_resource_from_yaml(yaml_file_path)
         return {"message": f"Pod creation initiated from {yaml_file_path}."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -717,6 +785,7 @@ def check_if_I_am_Winner_endpoint(service_id: str):
         return {"message": f"I am not the winner for the service {service_id}"}
 
 
+# Fix
 @app.post("/deploy_service/{service_id}", tags=["Provider Functions"],
 description="""
 Provider AD starts the deployment of the requested federated service. Once it has been deployed, he confirms the operation by sending transaction to the smart contract.
