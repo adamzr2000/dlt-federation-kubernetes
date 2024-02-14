@@ -614,52 +614,52 @@ def check_deployed_info_endpoint(service_id: str):
          tags=["Provider Functions"], 
          description="Endpoint to check for new announcements")
 def check_service_announcements_endpoint():
-    new_service_event = contract.events.ServiceAnnouncement()  # Replace ServiceAnnouncementEvent() with the actual event
+    try:
+        new_service_event = Federation_contract.events.ServiceAnnouncement()  
 
-    # Determine the current block number
-    current_block = web3.eth.blockNumber
+        # Determine the current block number
+        current_block = web3.eth.blockNumber
 
-    # Calculate the start block for the event search (last 20 blocks)
-    start_block = max(0, current_block - 20)  # Ensure start block is not negative
+        # Calculate the start block for the event search (last 20 blocks)
+        start_block = max(0, current_block - 20)  # Ensure start block is not negative
 
-    # Fetch new events from the last 20 blocks
-    new_events = new_service_event.createFilter(fromBlock=start_block, toBlock='latest').get_all_entries()
+        # Fetch new events from the last 20 blocks
+        new_events = new_service_event.createFilter(fromBlock=start_block, toBlock='latest').get_all_entries()
 
-    open_services = []
-    message = ""
+        open_services = []
+        message = ""
 
-    for event in new_events:
-        service_id = web3.toText(event['args']['id']).rstrip('\x00')
-        requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
-        tx_hash = web3.toHex(event['transactionHash'])
-        address = event['address']
-        block_number = event['blockNumber']
+        for event in new_events:
+            service_id = web3.toText(event['args']['id']).rstrip('\x00')
+            requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
+            tx_hash = web3.toHex(event['transactionHash'])
+            address = event['address']
+            block_number = event['blockNumber']
 
-        if 'event' in event['args']:
-            event_name = web3.toText(event['args']['event'])
-        else:
-            event_name = ""
+            if 'event' in event['args']:
+                event_name = web3.toText(event['args']['event'])
+            else:
+                event_name = ""
 
-        # Assuming GetServiceState is a function you've defined that checks the state of a service
-        if GetServiceState(service_id) == 0:
+            if GetServiceState(service_id) == 0:
+                open_services.append(service_id)
+
+        if len(open_services) > 0:
             service_details = {
-                "service_id": service_id,
-                "requirements": requirements,
-                "tx_hash": tx_hash,
-                "contract_address": address,
-                "block": block_number,
-                "event_name": event_name
+                    "service_id": service_id,
+                    "requirements": requirements,
+                    "tx_hash": tx_hash,
+                    "contract_address": address,
+                    "block": block_number,
+                    "event_name": event_name
             }
-            open_services.append(service_details)
-
-    if len(open_services) > 0:
-        print('Announcement received:')
-        for service in open_services:
-            print(service)
-        return {"Announcements": open_services}
-    else:
-        return {"No new events found": "No new services announced in the last 20 blocks."}
-
+            print('Announcement received:')
+            print(new_events)
+            return {"Announcements": service_details}
+        else:
+            return {"No new events found": "No new services announced in the last 20 blocks."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/place_bid/{service_id}-{service_price}",
           summary="Place a bid",
