@@ -6,10 +6,16 @@ import yaml
 from dotenv import load_dotenv
 from web3 import Web3, HTTPProvider, WebsocketProvider
 from web3.middleware import geth_poa_middleware
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
+from enum import Enum
 
+
+class YAMLFile(str, Enum):
+    nginx_deployment = "nginx-deployment.yaml"
+    nginx_pod = "nginx-pod.yaml"
+    nginx_service = "nginx-service.yaml"
 
 # Define your tags
 tags_metadata = [
@@ -64,8 +70,6 @@ Provider AD starts the deployment of the requested federated service
 Once the provider deploys the federated service, it notifies the consumer AD
 """
 )
-
-
 
 # Initial setup: Determine domain and load environment variables
 domain = input("Domain function (consumer/provider): ").strip().lower()
@@ -390,61 +394,6 @@ def DisplayServiceState(serviceID):
     else:
         print(f"Error: state for service {serviceID} is {current_service_state}")
 
-
-# def create_pod_from_yaml(k8s_api, yaml_file_path):
-#     """
-#     Creates a Kubernetes pod from a specified YAML file.
-
-#     Parameters:
-#     - k8s_api: CoreV1Api instance for Kubernetes API interactions.
-#     - yaml_file_path: Path to the YAML file containing pod configuration.
-
-#     Reads pod configuration from the YAML, creates the pod in the specified or default namespace, and prints the pod name.
-#     """
-#     try:
-#         with open(yaml_file_path, 'r') as file:
-#             pod_manifest = yaml.safe_load(file)
-#         namespace = pod_manifest.get("metadata", {}).get("namespace", "default")
-#         resp = k8s_api.create_namespaced_pod(body=pod_manifest, namespace=namespace)
-#         print("Pod created:", resp.metadata.name)
-#     except ApiException as e:
-#         print(f"Exception when calling Kubernetes API: {e}")
-#         raise
-
-# def create_service_from_yaml(k8s_api, yaml_file_path):
-#     """
-#     Creates a Kubernetes service from a specified YAML file.
-
-#     Parameters:
-#     - k8s_api: An instance of CoreV1Api for Kubernetes API interactions.
-#     - yaml_file_path: Path to the YAML file containing the service configuration.
-#     """
-#     try:
-#         with open(yaml_file_path, 'r') as file:
-#             service_manifest = yaml.safe_load(file)
-#         resp = k8s_api.create_namespaced_service(body=service_manifest, namespace="default")
-#         print("Service created:", resp.metadata.name)
-#     except ApiException as e:
-#         print(f"Exception when calling Kubernetes API: {e}")
-#         raise
-
-# def create_deployment_from_yaml(k8s_api, yaml_file_path):
-#     """
-#     Creates a Kubernetes deployment from a specified YAML file.
-
-#     Parameters:
-#     - k8s_api: An instance of AppsV1Api for Kubernetes API interactions.
-#     - yaml_file_path: Path to the YAML file containing the deployment configuration.
-#     """
-#     try:
-#         with open(yaml_file_path, 'r') as file:
-#             deployment_manifest = yaml.safe_load(file)
-#         resp = k8s_api.create_namespaced_deployment(body=deployment_manifest, namespace="default")
-#         print("Deployment created:", resp.metadata.name)
-#     except ApiException as e:
-#         print(f"Exception when calling Kubernetes API: {e}")
-#         raise
-
 def create_resource_from_yaml(yaml_file_path):
     """
     Creates a Kubernetes resource (Pod, Service, Deployment) from a specified YAML file.
@@ -480,77 +429,75 @@ def create_resource_from_yaml(yaml_file_path):
         print(f"Unexpected error: {e}")
         raise
 
-def delete_pod(k8s_api, pod_name, namespace='default'):
+def delete_resource_from_yaml(yaml_file_path):
     """
-    Deletes a specified pod within a given namespace.
+    Deletes a Kubernetes resource (Pod, Service, Deployment) specified in a YAML file.
 
     Parameters:
-    - k8s_api: CoreV1Api instance of the Kubernetes client.
-    - pod_name: String name of the pod to delete.
-    - namespace: String name of the namespace where the pod is located. Defaults to 'default'.
+    - yaml_file_path: Path to the YAML file containing the resource configuration.
     """
     try:
-        # Delete the pod
-        resp = k8s_api.delete_namespaced_pod(name=pod_name,
-                                             namespace=namespace,
-                                             body=client.V1DeleteOptions(),
-                                             grace_period_seconds=0)
-        print(f"Pod '{pod_name}' deleted.")
-        return resp
-    except ApiException as e:
-        if e.status == 404:
-            print(f"Pod '{pod_name}' not found.")
-        else:
-            print(f"Error deleting pod '{pod_name}': {e}")
-        return None
+        with open(yaml_file_path, 'r') as file:
+            resources = yaml.safe_load_all(file)
+            for resource in resources:
+                kind = resource.get("kind")
+                metadata = resource.get("metadata", {})
+                namespace = metadata.get("namespace", "default")
+                name = metadata.get("name")
 
-def delete_service(k8s_api, service_name, namespace='default'):
-    """
-    Deletes a specified service within a given namespace.
+                # Dynamically dispatch to the appropriate deletion function based on the resource kind
+                if kind == "Pod":
+                    client.CoreV1Api().delete_namespaced_pod(name=name, namespace=namespace)
+                elif kind == "Service":
+                    client.CoreV1Api().delete_namespaced_service(name=name, namespace=namespace)
+                elif kind == "Deployment":
+                    client.AppsV1Api().delete_namespaced_deployment(name=name, namespace=namespace)
+                else:
+                    raise ValueError(f"Unsupported resource kind for deletion: {kind}")
 
-    Parameters:
-    - k8s_api: CoreV1Api instance of the Kubernetes client.
-    - service_name: String name of the service to delete.
-    - namespace: String name of the namespace where the service is located. Defaults to 'default'.
-    """
-    try:
-        # Delete the service
-        resp = k8s_api.delete_namespaced_service(name=service_name,
-                                                 namespace=namespace,
-                                                 body=client.V1DeleteOptions())
-        print(f"Service '{service_name}' deleted.")
-        return resp
+                print(f"{kind} '{name}' deleted from namespace '{namespace}'.")
     except ApiException as e:
-        if e.status == 404:
-            print(f"Service '{service_name}' not found.")
-        else:
-            print(f"Error deleting service '{service_name}': {e}")
-        return None
+        print(f"Exception when calling Kubernetes API for deletion: {e}")
+        raise
+    except ValueError as e:
+        print(e)
+        raise
+    except Exception as e:
+        print(f"Unexpected error during deletion: {e}")
+        raise
 
 
 # -------------------------------------------- K8S API FUNCTIONS --------------------------------------------#
-@app.post("/create-pod",
-tags=["K8s Functions"])
-async def create_pod_endpoint():
+@app.post("/create_resource", tags=["K8s Functions"])
+async def create_resource_endpoint(yaml_file: YAMLFile):
     """
-    Endpoint to create a Kubernetes pod from a YAML file.
+    Endpoint to create a Kubernetes resource based on selected YAML file.
     """
+    # The value of yaml_file is now one of the Enum's values, e.g., "nginx-pod.yaml"
+    yaml_file_path = f"descriptors/{yaml_file.value}"
+
     try:
-        yaml_file_path = "./descriptorss/nginx-pod.yaml"
+        # Assuming create_resource_from_yaml is a function you've defined to handle the creation
         create_resource_from_yaml(yaml_file_path)
-        return {"message": f"Pod creation initiated from {yaml_file_path}."}
+        return {"message": f"Resource creation initiated from {yaml_file.value}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/delete-pod",
-tags=["K8s Functions"])
-async def delete_pod_endpoint(pod_name: str):
+@app.delete("/delete_resource", tags=["K8s Functions"])
+async def delete_resource_endpoint(yaml_file: YAMLFile):
     """
-    Endpoint to delete a specified Kubernetes pod.
+    Endpoint to delete a Kubernetes resource based on selected YAML file.
     """
+    yaml_file_path = f"descriptors/{yaml_file.value}"
+
+    # Ensure the file exists before attempting deletion
+    if not os.path.isfile(yaml_file_path):
+        raise HTTPException(status_code=404, detail=f"File {yaml_file.value} not found.")
+
     try:
-        delete_pod(api_instance_coreV1, pod_name)
-        return {"message": f"Pod '{pod_name}' deleted"}
+        # Call the deletion function
+        delete_resource_from_yaml(yaml_file_path)
+        return {"message": f"Deletion initiated for resource defined in {yaml_file.value}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 # ------------------------------------------------------------------------------------------------------------------------------#
@@ -558,254 +505,267 @@ async def delete_pod_endpoint(pod_name: str):
 
 
 # -------------------------------------------- DLT API FUNCTIONS --------------------------------------------#
-@app.get("/", 
-summary="Web3 and Ethereum node info",
-tags=["Default DLT Functions"],
-description="Get detailed information about the Web3 connection and Ethereum node")
-def web3_info_endpoint():
-    print("\n\033[1m" + "IP address: " + str(ip_address) + "\033[0m")
-    print("\033[1m" + "Ethereum address: " + str(block_address) + "\033[0m")
-    print("Federation contract:\n", Federation_contract.functions)
-    message = {
-        "ip-address": ip_address,
-        "ethereum-address": block_address,
-        "contract-address": contract_address,
-        "domain-name": domain_name,
-        "service-id": service_id
-    }
-    return {"web3-info": message}
+@app.get("/",
+         summary="Get Web3 and Ethereum node info",
+         tags=["Default DLT Functions"],
+         description="Endpoint to get Web3 and Ethereum node info")
+async def web3_info_endpoint():
+    try:
+        print("\n\033[1m" + "IP address: " + str(ip_address) + "\033[0m")
+        print("\033[1m" + "Ethereum address: " + str(block_address) + "\033[0m")
+        print("Federation contract:\n", Federation_contract.functions)
+        message = {
+            "ip-address": ip_address,
+            "ethereum-address": block_address,
+            "contract-address": contract_address,
+            "domain-name": domain_name,
+            "service-id": service_id
+        }
+        return {"web3-info": message}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/register_domain",
-tags=["Default DLT Functions"],
-description="""
-This function registers a domain in the smart contract by calling the addOperator function
-""")
-def register_domain_endpoint():
+@app.post("/register_domain", 
+          summary="Register a domain",
+          tags=["Default DLT Functions"],
+          description="Endpoint to register a domain in the smart contract")  
+async def register_domain_endpoint():
     global domain_registered  
-    if domain_registered == False:
-        
-        # Build the transaction for the addOperator function
-        add_operator_transaction = Federation_contract.functions.addOperator(Web3.toBytes(text=domain_name)).buildTransaction({
-            'from': block_address,
-            'nonce': nonce
-        })
+    try:
+        if domain_registered == False:
+            
+            # Build the transaction for the addOperator function
+            add_operator_transaction = Federation_contract.functions.addOperator(Web3.toBytes(text=domain_name)).buildTransaction({
+                'from': block_address,
+                'nonce': nonce
+            })
 
-        # Send the signed transaction
-        tx_hash = send_signed_transaction(add_operator_transaction)
+            # Send the signed transaction
+            tx_hash = send_signed_transaction(add_operator_transaction)
 
-        domain_registered = True
-        print("\n\033[1;32m(TX) Domain has been registered\033[0m")
-        return {"Transaction": f"Domain {domain_name} has been registered"}
-    else:
-        return {"error": "Domain already registered"}
+            domain_registered = True
+            print("\n\033[1;32m(TX) Domain has been registered\033[0m")
+            return {"message": f"Domain {domain_name} has been registered"}
+        else:
+            return {"error": "Domain already registered in the SC"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.post("/create_service_announcement", 
-tags=["Consumer Functions"],
-description="""
-Triggered by the consumer domain, once it has beed decided the need of federate part of a service, 
-an announcement is broadcast to all potential provider ADs. The announcement conveys the requirements for a given service.
-""")
-def create_service_announcement_endpoint():
+@app.post("/create_service_announcement",
+          summary="Create a service announcement", 
+          tags=["Consumer Functions"],
+          description="Endpoint to create a service announcement")
+async def create_service_announcement_endpoint():
     global bids_event
-    bids_event = AnnounceService()
-    print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
-    return {"Transaction": "Service announcement sent to the SC", "From": f"{domain_name} - {block_address}"}
-
+    try:
+        bids_event = AnnounceService()
+        print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
+        return {"message": f"Service announcement sent to the SC, from {domain_name} - {block_address}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/check_service_state/{service_id}",
-tags=["Default DLT Functions"],
-description="""
-This function retrieves the current state of a service specified by its ID by calling the GetServiceState function of the smart contract. 
-If the state is 0, it means the service is open, 1 means the service is closed, and 2 means the service has been deployed
-""")
-def check_service_state_endpoint(service_id: str):
-    current_service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=service_id)).call()
-    if current_service_state == 0:
-        return {"service-id": service_id, "state": "open"}
-    elif current_service_state == 1:
-        return {"service-id": service_id, "state": "closed"}
-    elif current_service_state == 2:
-        return {"service-id": service_id, "state": "deployed"}
-    else:
-        return { "error" : f"service-id {service_id}, state is {current_service_state}"}
-    
-
-@app.get("/check_deployed_info/{service_id}", tags=["Default DLT Functions"])
-def check_deployed_info_endpoint(service_id: str):
-    service_id_bytes = web3.toBytes(text=service_id)  # Convert string to bytes
-    service_id, service_endpoint_provider, external_ip = Federation_contract.functions.GetServiceInfo(_id=service_id_bytes, provider=False, call_address=block_address).call()
-    _service_id = service_id.rstrip(b'\x00')  # Apply rstrip on bytes-like object
-    _service_endpoint_provider = service_endpoint_provider.rstrip(b'\x00')
-    _external_ip = external_ip.rstrip(b'\x00')
-    return {"service-id": _service_id, "service-endpoint-provider": _service_endpoint_provider, "external-ip": _external_ip}
-
-
-@app.get("/check_service_announcements", 
-tags=["Provider Functions"],
-description=""" 
-Retrieves new service announcements, checks their state, and returns a JSON response with the details of any open services found or a message indicating no new events. 
-""")
-def check_service_announcements_endpoint():
-
-    new_service_event = ServiceAnnouncementEvent()
-    open_services = []
-    new_events = new_service_event.get_all_entries()
-
-    message = ""
-    for event in new_events:
-        service_id = web3.toText(event['args']['id']).rstrip('\x00')
-        requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
-        tx_hash = web3.toHex(event['transactionHash'])
-        address =  event['address']
-        block_number = event['blockNumber']
-        if 'event' in event['args']:
-            event_name = web3.toText(event['args']['event'])
+         summary="Get service state",
+         tags=["Default DLT Functions"],
+         description="Endpoint to get the state of a service (specified by its ID)")
+async def check_service_state_endpoint(service_id: str):
+    try:
+        current_service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=service_id)).call()
+        if current_service_state == 0:
+            return {"service-id": service_id, "state": "open"}
+        elif current_service_state == 1:
+            return {"service-id": service_id, "state": "closed"}
+        elif current_service_state == 2:
+            return {"service-id": service_id, "state": "deployed"}
         else:
-            event_name = ""
+            return { "error" : f"service-id {service_id}, state is {current_service_state}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-        if GetServiceState(service_id) == 0:
-            open_services.append(service_id)
-    
-    if len(open_services) > 0:
+@app.get("/check_deployed_info/{service_id}",
+         summary="Get deployed info",
+         tags=["Default DLT Functions"],
+         description="Endpoint to get deployed info for a service") 
+async def check_deployed_info_endpoint(service_id: str):
+    try:
+        service_id_bytes = web3.toBytes(text=service_id)  # Convert string to bytes
+        service_id, service_endpoint_provider, external_ip = Federation_contract.functions.GetServiceInfo(_id=service_id_bytes, provider=False, call_address=block_address).call()
+        _service_id = service_id.rstrip(b'\x00')  # Apply rstrip on bytes-like object
+        _service_endpoint_provider = service_endpoint_provider.rstrip(b'\x00')
+        _external_ip = external_ip.rstrip(b'\x00')
         message = {
-            "service-id": service_id,
-            "requirements": requirements,
-            "tx-hash": tx_hash,
-            "contract-address": address,
-            "block": block_number
+            "service-id": _service_id,
+            "service-endpoint-provider": _service_endpoint_provider,
+            "external-ip": _external_ip
         }
-        print('Announcement received:')
-        print(new_events)
+        return {"message": message}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-        return {"Announcement received": message}
-    else:
-        return {"No new events found": message}
+@app.get("/check_service_announcements",
+         summary="Check announcements",
+         tags=["Provider Functions"], 
+         description="Endpoint to check for new announcements")
+async def check_service_announcements_endpoint():
+    try:
+        new_service_event = ServiceAnnouncementEvent()
+        open_services = []
+        new_events = new_service_event.get_all_entries()
 
+        message = ""
+        for event in new_events:
+            service_id = web3.toText(event['args']['id']).rstrip('\x00')
+            requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
+            tx_hash = web3.toHex(event['transactionHash'])
+            address =  event['address']
+            block_number = event['blockNumber']
+            if 'event' in event['args']:
+                event_name = web3.toText(event['args']['event'])
+            else:
+                event_name = ""
 
-@app.post("/place_bid/{service_id}-{service_price}", tags=["Provider Functions"],
-description="""
-This function allows a provider to place a bid for a service by providing the service ID and the bid price. 
-It sends the bid offer to the smart contract and returns a JSON response indicating the transaction details.
-""")
-def place_bid_endpoint(service_id: str, service_price: int):
+            if GetServiceState(service_id) == 0:
+                open_services.append(service_id)
+        
+        if len(open_services) > 0:
+            message = {
+                "service-id": service_id,
+                "requirements": requirements,
+                "tx-hash": tx_hash,
+                "contract-address": address,
+                "block": block_number
+            }
+            print('Announcement received:')
+            print(new_events)
+
+            return {"message": message}
+        else:
+            return {"No new events found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/place_bid/{service_id}-{service_price}",
+          summary="Place a bid",
+          tags=["Provider Functions"],
+          description="Endpoint to place a bid for a service")
+async def place_bid_endpoint(service_id: str, service_price: int):
     global winnerChosen_event 
-    winnerChosen_event  = PlaceBid(service_id, service_price)
-    print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
-    return {"Transaction": "Bid offer sent to the Smart Contract", "price(₿)": service_price, "from": block_address}
+    try:
+        winnerChosen_event  = PlaceBid(service_id, service_price)
+        print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
+        return {"message": f"Bid offer sent to the SC, from {block_address}, price={service_price} ₿"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.get('/check_bids/{service_id}', tags=["Consumer Functions"],
-description="""
-This function allows a consumer to check for new bids for a specific service by providing the service ID. 
-It retrieves the new bid events, checks for the highest bid index, and returns a JSON response with the bid information if any new bids are found
-""")
-def check_bids_endpoint(service_id: str):
+@app.get('/check_bids/{service_id}',
+         summary="Check bids",
+         tags=["Consumer Functions"],
+         description="Endpoint to check bids for a service")  
+async def check_bids_endpoint(service_id: str):
     global bids_event
     message = ""
     new_events = bids_event.get_all_entries()
     bidderArrived = False
-    for event in new_events:
-        # New bid received
-        event_id = str(web3.toText(event['args']['_id']))
-        # service id, service id, index of the bid
-        print(service_id, web3.toText(event['args']['_id']), event['args']['max_bid_index'])
-                
-        bid_index = int(event['args']['max_bid_index'])
-        bidderArrived = True 
-        if int(bid_index) < 2:
-            print("\nBids-info = [provider address , service price , bid index]\n")
-            bid_info = GetBidInfo(int(bid_index-1))
-            print(bid_info)
-            message = {
-                "provider-address": bid_info[0],
-                "service-price": bid_info[1],
-                "bid-index": bid_info[2]
-            }
-            break
-    if bidderArrived:
-        return {"message": f"There are new bids for the service {service_id}", "bid-info": message}
+    try:
+        for event in new_events:
+            # New bid received
+            event_id = str(web3.toText(event['args']['_id']))
+            # service id, service id, index of the bid
+            print(service_id, web3.toText(event['args']['_id']), event['args']['max_bid_index'])
+                    
+            bid_index = int(event['args']['max_bid_index'])
+            bidderArrived = True 
+            if int(bid_index) < 2:
+                print("\nBids-info = [provider address , service price , bid index]\n")
+                bid_info = GetBidInfo(int(bid_index-1))
+                print(bid_info)
+                message = {
+                    "provider-address": bid_info[0],
+                    "service-price": bid_info[1],
+                    "bid-index": bid_info[2]
+                }
+                break
+        if bidderArrived:
+            return {"bids": message}
 
-    else:
-        return {"message": f"There are no bids yet for the service {service_id}"}
+        else:
+            return {"message": f"No bids found for the service {service_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.post('/choose_provider/{bid_index}', tags=["Consumer Functions"],
-description="""
-This function allows a consumer to choose a provider for a service by specifying the bid index. 
-It retrieves the bid events, chooses the provider associated with the specified bid index, and returns a JSON response indicating the transaction details.
-""")
-def choose_provider_endpoint(bid_index: int):
+@app.post('/choose_provider/{bid_index}',
+          summary="Choose provider",
+          tags=["Consumer Functions"],
+          description="Endpoint to choose a provider")
+async def choose_provider_endpoint(bid_index: int):
     global bids_event
-    new_events = bids_event.get_all_entries()
-    for event in new_events:
-        event_id = str(web3.toText(event['args']['_id'])).rstrip('\x00')
-        print("\n\033[1;32m(TX-3) Provider choosen! (bid index=" + str(bid_index) + ")\033[0m")
-        ChooseProvider(bid_index)
-        # Service closed (state 1)
-    return {"Transaction": f"Provider choosen!", "service-id": event_id, "bid-index": bid_index}    
+    try:
+        new_events = bids_event.get_all_entries()
+        for event in new_events:
+            event_id = str(web3.toText(event['args']['_id'])).rstrip('\x00')
+            print("\n\033[1;32m(TX-3) Provider choosen! (bid index=" + str(bid_index) + ")\033[0m")
+            ChooseProvider(bid_index)
+            # Service closed (state 1)
+        return {"message": f"Provider chosen!", "service-id": event_id, "bid-index": bid_index}    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.get("/check_winner/{service_id}", tags=["Provider Functions"],
-description="""
-Ths function allows a provider to check if there is a winner for a specific service by providing the service ID. 
-""")
-def check_winner_endpoint(service_id: str):
+@app.get("/check_winner/{service_id}", 
+         summary="Check for winner",
+         tags=["Provider Functions"],
+         description="Endpoint to check if there is a winner for a service")
+async def check_winner_endpoint(service_id: str):
     global winnerChosen_event 
+    try:
+        new_events = winnerChosen_event.get_all_entries()
+        winnerChosen = False
+        # Ask to the Federation SC if there is a winner
+        for event in new_events:
+            event_serviceid = web3.toText(event['args']['_id']).rstrip('\x00')
+            if event_serviceid == service_id:
+                # Winner choosen
+                winnerChosen = True
+                break
+        if winnerChosen:
+            return {"message": f"There is a winner for the service {service_id}"}
+        else:
+            return {"message": f"No winner yet for the service {service_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    new_events = winnerChosen_event.get_all_entries()
+@app.get("/check_if_i_am_winner/{service_id}",
+         summary="Check if I am winner",
+         tags=["Provider Functions"],
+         description="Endpoint to check if provider is the winner")
+async def check_if_I_am_Winner_endpoint(service_id: str):
+    try:
+        am_i_winner = CheckWinner(service_id)
+        if am_i_winner == True:
+            print("I am a Winner")
+            return {"message": f"I am the winner for the service {service_id}"}
+        else:
+            print("I am not a Winner")
+            return {"message": f"I am not the winner for the service {service_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    winnerChosen = False
-    # Ask to the Federation SC if there is a winner
-    for event in new_events:
-        event_serviceid = web3.toText(event['args']['_id']).rstrip('\x00')
-        if event_serviceid == service_id:
-            # Winner choosen
-            winnerChosen = True
-            break
-    if winnerChosen:
-        return {"message": f"There is a winner for the service {service_id}"}
-
-    else:
-        return {"message": f"There is no winner yet for the service {service_id}"}
-
-
-@app.get("/check_if_I_am_Winner/{service_id}", tags=["Provider Functions"],
-description="""
-Ths function allows a provider to check if he is the winner for a specific service by providing the service ID. 
-""")
-def check_if_I_am_Winner_endpoint(service_id: str):
-     # Provider AD ask if he is the winner
-    am_i_winner = CheckWinner(service_id)
-    if am_i_winner == True:
-        print("I am a Winner")
-        return {"message": f"I am the winner for the service {service_id}"}
-    else:
-        print("I am not a Winner")
-        return {"message": f"I am not the winner for the service {service_id}"}
-
-
-# Fix
-@app.post("/deploy_service/{service_id}", tags=["Provider Functions"],
-description="""
-Provider AD starts the deployment of the requested federated service. Once it has been deployed, he confirms the operation by sending transaction to the smart contract.
-The smart contract records the successful deployment and initiates charging for the federated service
-""")
-def deploy_service_endpoint(service_id: str):
-    if CheckWinner(service_id):
-
-        federated_ns_name = "federated_service"
-        federated_nsi_id = create_nsi(federated_ns_name, True)
-        #federated_nsi_id = 5
-        federated_nsi_info = {
-            "name": federated_ns_name,
-            "id":  federated_nsi_id
-        }
-        ServiceDeployed(service_id, ipaddress)
-        print("\n\033[1;32m(TX-4) Service deployed\033[0m")
-        return {"Transaction": "Service deployed", "service-info": federated_nsi_info}
-    else:
-        return {"Error": "You are not the winner"}   
+@app.post("/deploy_service/{service_id}",
+          summary="Deploy service",
+          tags=["Provider Functions"],
+          description="Endpoint for provider to deploy service")
+async def deploy_service_endpoint(service_id: str):
+    try:
+        if CheckWinner(service_id):
+            create_resource_from_yaml(f"descriptors/{YAMLFile.nginx_pod}")
+            create_resource_from_yaml(f"descriptors/{YAMLFile.nginx_service}")
+            external_ip = "6.6.6.6"
+            ServiceDeployed(service_id, external_ip)
+            print("\n\033[1;32m(TX-4) Service deployed\033[0m")
+            return {"message": "Service deployed"}
+        else:
+            return {"message": "You are not the winner"}   
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))            
 # ------------------------------------------------------------------------------------------------------------------------------#
 
 
