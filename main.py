@@ -509,7 +509,7 @@ async def delete_resource_endpoint(yaml_file: YAMLFile):
          summary="Get Web3 and Ethereum node info",
          tags=["Default DLT Functions"],
          description="Endpoint to get Web3 and Ethereum node info")
-async def web3_info_endpoint():
+def web3_info_endpoint():
     try:
         print("\n\033[1m" + "IP address: " + str(ip_address) + "\033[0m")
         print("\033[1m" + "Ethereum address: " + str(block_address) + "\033[0m")
@@ -529,7 +529,7 @@ async def web3_info_endpoint():
           summary="Register a domain",
           tags=["Default DLT Functions"],
           description="Endpoint to register a domain in the smart contract")  
-async def register_domain_endpoint():
+def register_domain_endpoint():
     global domain_registered  
     try:
         if domain_registered == False:
@@ -555,7 +555,7 @@ async def register_domain_endpoint():
           summary="Create a service announcement", 
           tags=["Consumer Functions"],
           description="Endpoint to create a service announcement")
-async def create_service_announcement_endpoint():
+def create_service_announcement_endpoint():
     global bids_event
     try:
         bids_event = AnnounceService()
@@ -568,7 +568,7 @@ async def create_service_announcement_endpoint():
          summary="Get service state",
          tags=["Default DLT Functions"],
          description="Endpoint to get the state of a service (specified by its ID)")
-async def check_service_state_endpoint(service_id: str):
+def check_service_state_endpoint(service_id: str):
     try:
         current_service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=service_id)).call()
         if current_service_state == 0:
@@ -586,7 +586,7 @@ async def check_service_state_endpoint(service_id: str):
          summary="Get deployed info",
          tags=["Default DLT Functions"],
          description="Endpoint to get deployed info for a service") 
-async def check_deployed_info_endpoint(service_id: str):
+def check_deployed_info_endpoint(service_id: str):
     try:
         service_id_bytes = web3.toBytes(text=service_id)  # Convert string to bytes
         service_id, service_endpoint_provider, external_ip = Federation_contract.functions.GetServiceInfo(_id=service_id_bytes, provider=False, call_address=block_address).call()
@@ -606,7 +606,7 @@ async def check_deployed_info_endpoint(service_id: str):
          summary="Check announcements",
          tags=["Provider Functions"], 
          description="Endpoint to check for new announcements")
-async def check_service_announcements_endpoint():
+def check_service_announcements_endpoint():
     new_service_event = ServiceAnnouncementEvent()
     open_services = []
     new_events = new_service_event.get_all_entries()
@@ -648,7 +648,7 @@ async def check_service_announcements_endpoint():
           summary="Place a bid",
           tags=["Provider Functions"],
           description="Endpoint to place a bid for a service")
-async def place_bid_endpoint(service_id: str, service_price: int):
+def place_bid_endpoint(service_id: str, service_price: int):
     global winnerChosen_event 
     try:
         winnerChosen_event  = PlaceBid(service_id, service_price)
@@ -661,7 +661,7 @@ async def place_bid_endpoint(service_id: str, service_price: int):
          summary="Check bids",
          tags=["Consumer Functions"],
          description="Endpoint to check bids for a service")  
-async def check_bids_endpoint(service_id: str):
+def check_bids_endpoint(service_id: str):
     global bids_event
     message = ""
     new_events = bids_event.get_all_entries()
@@ -697,7 +697,7 @@ async def check_bids_endpoint(service_id: str):
           summary="Choose provider",
           tags=["Consumer Functions"],
           description="Endpoint to choose a provider")
-async def choose_provider_endpoint(bid_index: int):
+def choose_provider_endpoint(bid_index: int):
     global bids_event
     try:
         new_events = bids_event.get_all_entries()
@@ -714,7 +714,7 @@ async def choose_provider_endpoint(bid_index: int):
          summary="Check for winner",
          tags=["Provider Functions"],
          description="Endpoint to check if there is a winner for a service")
-async def check_winner_endpoint(service_id: str):
+def check_winner_endpoint(service_id: str):
     global winnerChosen_event 
     try:
         new_events = winnerChosen_event.get_all_entries()
@@ -737,7 +737,7 @@ async def check_winner_endpoint(service_id: str):
          summary="Check if I am winner",
          tags=["Provider Functions"],
          description="Endpoint to check if provider is the winner")
-async def check_if_I_am_Winner_endpoint(service_id: str):
+def check_if_I_am_Winner_endpoint(service_id: str):
     try:
         am_i_winner = CheckWinner(service_id)
         if am_i_winner == True:
@@ -753,7 +753,7 @@ async def check_if_I_am_Winner_endpoint(service_id: str):
           summary="Deploy service",
           tags=["Provider Functions"],
           description="Endpoint for provider to deploy service")
-async def deploy_service_endpoint(service_id: str):
+def deploy_service_endpoint(service_id: str):
     try:
         if CheckWinner(service_id):
             create_resource_from_yaml(f"descriptors/{YAMLFile.nginx_pod}")
