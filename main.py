@@ -211,6 +211,7 @@ def AnnounceService():
         Filter: A filter for catching the 'NewBid' event that is emitted when a new bid is placed for the announced service.
     """
     global nonce
+    service_id = 'service' + str(int(time.time()))
     announce_transaction = Federation_contract.functions.AnnounceService(
         _requirements=web3.toBytes(text=service_requirements),
         _endpoint_consumer=web3.toBytes(text=service_endpoint_consumer),
@@ -635,11 +636,7 @@ def check_service_announcements_endpoint():
             tx_hash = web3.toHex(event['transactionHash'])
             address = event['address']
             block_number = event['blockNumber']
-
-            if 'event' in event['args']:
-                event_name = web3.toText(event['args']['event'])
-            else:
-                event_name = ""
+            event_name = event['event']
 
             if GetServiceState(service_id) == 0:
                 open_services.append(service_id)
