@@ -607,12 +607,12 @@ async def check_deployed_info_endpoint(service_id: str):
          tags=["Provider Functions"], 
          description="Endpoint to check for new announcements")
 async def check_service_announcements_endpoint():
-    try:
-        new_service_event = ServiceAnnouncementEvent()
-        open_services = []
-        new_events = new_service_event.get_all_entries()
+    new_service_event = ServiceAnnouncementEvent()
+    open_services = []
+    new_events = new_service_event.get_all_entries()
 
-        message = ""
+    message = ""
+    try:
         for event in new_events:
             service_id = web3.toText(event['args']['id']).rstrip('\x00')
             requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
