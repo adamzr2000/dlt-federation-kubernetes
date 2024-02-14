@@ -67,7 +67,8 @@ Provider AD starts the deployment of the requested federated service
 
 **5) USAGE & CHARGING**
 
-Once the provider deploys the federated service, it notifies the consumer AD
+Once the provider deploys the federated service, it notifies the consumer AD with connection details
+
 """
 )
 
@@ -209,6 +210,7 @@ def AnnounceService():
     Returns:
         Filter: A filter for catching the 'NewBid' event that is emitted when a new bid is placed for the announced service.
     """
+    global nonce
     announce_transaction = Federation_contract.functions.AnnounceService(
         _requirements=web3.toBytes(text=service_requirements),
         _endpoint_consumer=web3.toBytes(text=service_endpoint_consumer),
@@ -248,6 +250,7 @@ def ChooseProvider(bid_index):
     Args:
         bid_index (int): The index of the bid that identifies the chosen provider.
     """
+    global nonce
     choose_transaction = Federation_contract.functions.ChooseProvider(
         _id=web3.toBytes(text=service_id),
         bider_index=bid_index
@@ -319,6 +322,7 @@ def PlaceBid(service_id, service_price):
         Filter: A filter for catching the 'ServiceAnnouncementClosed' event that is emitted when a service
                 announcement is closed.
     """
+    global nonce
     place_bid_transaction = Federation_contract.functions.PlaceBid(
         _id=web3.toBytes(text=service_id),
         _price=service_price,
@@ -366,6 +370,7 @@ def ServiceDeployed(service_id, external_ip):
         service_id (str): The unique identifier of the service.
         external_ip (str): The external IP address for the deployed service (~ exposed IP).
     """
+    global nonce
     service_deployed_transaction = Federation_contract.functions.ServiceDeployed(
         info=web3.toBytes(text=external_ip),
         _id=web3.toBytes(text=service_id)
@@ -531,6 +536,7 @@ def web3_info_endpoint():
           description="Endpoint to register a domain in the smart contract")  
 def register_domain_endpoint():
     global domain_registered  
+    global nonce
     try:
         if domain_registered == False:
             
@@ -560,7 +566,8 @@ def create_service_announcement_endpoint():
     try:
         bids_event = AnnounceService()
         print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
-        return {"message": f"Service announcement sent to the SC, from {domain_name} - {block_address}"}
+        return {"message": "Service announcement sent to the SC", "from": f"{domain_name} - {block_address}"}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -607,46 +614,40 @@ def check_deployed_info_endpoint(service_id: str):
          tags=["Provider Functions"], 
          description="Endpoint to check for new announcements")
 def check_service_announcements_endpoint():
-    try:
-        new_service_event = ServiceAnnouncementEvent()
-        newService = False
-        open_services = []
+    new_service_event = ServiceAnnouncementEvent()
+    open_services = []
+    new_events = new_service_event.get_all_entries()
+
+    message = ""
+    for event in new_events:
+        service_id = web3.toText(event['args']['id']).rstrip('\x00')
+        requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
+        tx_hash = web3.toHex(event['transactionHash'])
+        address =  event['address']
+        block_number = event['blockNumber']
+        if 'event' in event['args']:
+            event_name = web3.toText(event['args']['event'])
+        else:
+            event_name = ""
+
+        if GetServiceState(service_id) == 0:
+            open_services.append(service_id)
+    
+    if len(open_services) > 0:
+        message = {
+            "service-id": service_id,
+            "requirements": requirements,
+            "tx-hash": tx_hash,
+            "contract-address": address,
+            "block": block_number
+        }
+        print('Announcement received:')
+        print(new_events)
+
+        return {"Announcement received": message}
+    else:
+        return {"No new events found": message}
         
-        # Provider AD wait for service announcements
-        while not newService:
-            new_events = new_service_event.get_all_entries()
-
-            message = ""
-            for event in new_events:
-                service_id = web3.toText(event['args']['id']).rstrip('\x00')
-                requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
-                tx_hash = web3.toHex(event['transactionHash'])
-                address = event['address']
-                block_number = event['blockNumber']
-                if 'event' in event['args']:
-                    event_name = web3.toText(event['args']['event'])
-                else:
-                    event_name = ""
-
-                if GetServiceState(service_id) == 0:
-                    open_services.append(service_id)
-            
-            if len(open_services) > 0:
-                message = {
-                    "service-id": service_id,
-                    "requirements": requirements,
-                    "tx-hash": tx_hash,
-                    "contract-address": address,
-                    "block": block_number
-                }
-                print('Announcement received:')
-                print(new_events)
-
-                return {"message": message}
-            else:
-                return {"message": "No new events found"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/place_bid/{service_id}-{service_price}",
           summary="Place a bid",
