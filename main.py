@@ -606,43 +606,41 @@ def check_deployed_info_endpoint(service_id: str):
          summary="Check announcements",
          tags=["Provider Functions"], 
          description="Endpoint to check for new announcements")
-def check_service_announcements_endpoint():
+async def check_service_announcements_endpoint():
     new_service_event = ServiceAnnouncementEvent()
     open_services = []
     new_events = new_service_event.get_all_entries()
 
     message = ""
-    try:
-        for event in new_events:
-            service_id = web3.toText(event['args']['id']).rstrip('\x00')
-            requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
-            tx_hash = web3.toHex(event['transactionHash'])
-            address =  event['address']
-            block_number = event['blockNumber']
-            if 'event' in event['args']:
-                event_name = web3.toText(event['args']['event'])
-            else:
-                event_name = ""
-
-            if GetServiceState(service_id) == 0:
-                open_services.append(service_id)
-        
-        if len(open_services) > 0:
-            message = {
-                "service-id": service_id,
-                "requirements": requirements,
-                "tx-hash": tx_hash,
-                "contract-address": address,
-                "block": block_number
-            }
-            print('Announcement received:')
-            print(new_events)
-
-            return {"message": message}
+    for event in new_events:
+        service_id = web3.toText(event['args']['id']).rstrip('\x00')
+        requirements = web3.toText(event['args']['requirements']).rstrip('\x00')
+        tx_hash = web3.toHex(event['transactionHash'])
+        address =  event['address']
+        block_number = event['blockNumber']
+        if 'event' in event['args']:
+            event_name = web3.toText(event['args']['event'])
         else:
-            return {"No new events found"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            event_name = ""
+
+        if GetServiceState(service_id) == 0:
+            open_services.append(service_id)
+    
+    if len(open_services) > 0:
+        message = {
+            "service-id": service_id,
+            "requirements": requirements,
+            "tx-hash": tx_hash,
+            "contract-address": address,
+            "block": block_number
+        }
+        print('Announcement received:')
+        print(new_events)
+
+        return {"message": message}
+    else:
+        return {"No new events found": message}
+
 
 @app.post("/place_bid/{service_id}-{service_price}",
           summary="Place a bid",
