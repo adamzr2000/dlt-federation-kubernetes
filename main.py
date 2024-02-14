@@ -606,7 +606,7 @@ def check_deployed_info_endpoint(service_id: str):
          summary="Check announcements",
          tags=["Provider Functions"], 
          description="Endpoint to check for new announcements")
-async def check_service_announcements_endpoint():
+def check_service_announcements_endpoint():
     try:
         new_service_event = ServiceAnnouncementEvent()
         newService = False
