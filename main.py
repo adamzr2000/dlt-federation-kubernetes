@@ -135,7 +135,7 @@ domain_registered = False
 # Initialize domain-specific configurations and variables
 if domain == "consumer":
     # Consumer-specific variables
-    service_id = 'service' + str(int(time.time()))
+    # service_id = 'service' + str(int(time.time()))
     service_endpoint_consumer = ip_address
     service_consumer_address = block_address
     service_requirements = 'service='
@@ -210,7 +210,6 @@ def AnnounceService():
     Returns:
         Filter: A filter for catching the 'NewBid' event that is emitted when a new bid is placed for the announced service.
     """
-    global nonce
     service_id = 'service' + str(int(time.time()))
     announce_transaction = Federation_contract.functions.AnnounceService(
         _requirements=web3.toBytes(text=service_requirements),
@@ -251,7 +250,6 @@ def ChooseProvider(bid_index):
     Args:
         bid_index (int): The index of the bid that identifies the chosen provider.
     """
-    global nonce
     choose_transaction = Federation_contract.functions.ChooseProvider(
         _id=web3.toBytes(text=service_id),
         bider_index=bid_index
@@ -323,7 +321,6 @@ def PlaceBid(service_id, service_price):
         Filter: A filter for catching the 'ServiceAnnouncementClosed' event that is emitted when a service
                 announcement is closed.
     """
-    global nonce
     place_bid_transaction = Federation_contract.functions.PlaceBid(
         _id=web3.toBytes(text=service_id),
         _price=service_price,
@@ -371,7 +368,6 @@ def ServiceDeployed(service_id, external_ip):
         service_id (str): The unique identifier of the service.
         external_ip (str): The external IP address for the deployed service (~ exposed IP).
     """
-    global nonce
     service_deployed_transaction = Federation_contract.functions.ServiceDeployed(
         info=web3.toBytes(text=external_ip),
         _id=web3.toBytes(text=service_id)
