@@ -2,6 +2,9 @@ import os
 import json
 import time
 import yaml
+import requests
+import httpx
+
 
 from dotenv import load_dotenv
 from web3 import Web3, HTTPProvider, WebsocketProvider
@@ -211,7 +214,8 @@ def AnnounceService():
     Returns:
         Filter: A filter for catching the 'NewBid' event that is emitted when a new bid is placed for the announced service.
     """
-    service_id = 'service' + str(int(time.time()))
+    global service_id
+    # service_id = 'service' + str(int(time.time()))
     announce_transaction = Federation_contract.functions.AnnounceService(
         _requirements=web3.toBytes(text=service_requirements),
         _endpoint_consumer=web3.toBytes(text=service_endpoint_consumer),
@@ -262,17 +266,17 @@ def ChooseProvider(bid_index):
     # Send the signed transaction
     tx_hash = send_signed_transaction(choose_transaction)
 
-def GetServiceState(serviceid):
+def GetServiceState(service_id):
     """
     Returns the current state of the service identified by the service ID.
     
     Args:
-        serviceid (str): The unique identifier of the service.
+        service_id (str): The unique identifier of the service.
     
     Returns:
         int: The state of the service (0 for Open, 1 for Closed, 2 for Deployed).
     """    
-    service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=serviceid)).call()
+    service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=service_id)).call()
     return service_state
 
 def GetDeployedInfo(service_id):
@@ -378,14 +382,14 @@ def ServiceDeployed(service_id, external_ip):
     # Send the signed transaction
     tx_hash = send_signed_transaction(service_deployed_transaction)
 
-def DisplayServiceState(serviceID):
+def DisplayServiceState(service_id):
     """
     Displays the current state of a service based on its ID. The state is printed to the console.
     
     Args:
-        serviceID (str): The unique identifier of the service.
+        service_id (str): The unique identifier of the service.
     """    
-    current_service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=serviceID)).call()
+    current_service_state = Federation_contract.functions.GetServiceState(_id=web3.toBytes(text=service_id)).call()
     if current_service_state == 0:
         print("\nService state", "Open")
     elif current_service_state == 1:
@@ -393,7 +397,7 @@ def DisplayServiceState(serviceID):
     elif current_service_state == 2:
         print("\nService state", "Deployed")
     else:
-        print(f"Error: state for service {serviceID} is {current_service_state}")
+        print(f"Error: state for service {service_id} is {current_service_state}")
 
 def create_resource_from_yaml(yaml_file_path):
     """
@@ -530,12 +534,11 @@ async def web3_info_endpoint():
           summary="Register a domain",
           tags=["Default DLT Functions"],
           description="Endpoint to register a domain in the smart contract")  
-async def register_domain_endpoint():
+def register_domain_endpoint():
     global domain_registered  
-    global nonce
+    # global nonce
     try:
-        if domain_registered == False:
-            
+        if not domain_registered:
             # Build the transaction for the addOperator function
             add_operator_transaction = Federation_contract.functions.addOperator(Web3.toBytes(text=domain_name)).buildTransaction({
                 'from': block_address,
@@ -549,7 +552,8 @@ async def register_domain_endpoint():
             print("\n\033[1;32m(TX) Domain has been registered\033[0m")
             return {"message": f"Domain {domain_name} has been registered"}
         else:
-            return {"error": "Domain already registered in the SC"}
+            error_message = f"Domain {domain_name} is already registered in the SC"
+            raise HTTPException(status_code=500, detail=error_message)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -557,7 +561,7 @@ async def register_domain_endpoint():
           summary="Create a service announcement", 
           tags=["Consumer Functions"],
           description="Endpoint to create a service announcement")
-async def create_service_announcement_endpoint():
+def create_service_announcement_endpoint():
     global bids_event
     try:
         bids_event = AnnounceService()
@@ -588,43 +592,46 @@ async def check_service_state_endpoint(service_id: str):
 @app.get("/check_deployed_info/{service_id}",
          summary="Get deployed info",
          tags=["Default DLT Functions"],
-         description="Endpoint to get deployed info for a service") 
+         description="Endpoint to get deployed info for a service and check e2e connectivity.") 
 async def check_deployed_info_endpoint(service_id: str):
     try:
         # Service deployed info
-        external_ip, service_endpoint_provider = GetDeployedInfo(service_id)
+        external_ip, service_endpoint_provider = GetDeployedInfo(service_id)  # Assume this function exists
         external_ip = external_ip.decode('utf-8')
         service_endpoint_provider = service_endpoint_provider.decode('utf-8')
 
         # Establish connectivity with the federated service
-        connected = False
-        while not connected:
-            connected, response_content = check_service_connectivity(external_ip)
-            if not connected:
-                print("Failed to establish connection with the federated service. Retrying...")
-        
-        print("Successfully connected to the federated service")
-        print(response_content)
-        
+        connected, response_content = await check_service_connectivity(external_ip)
+        if not connected:
+            print("Failed to establish connection with the federated service.")
+            return {"error": "Failed to establish connection with the federated service."}
+
         message = {
-            "service-id": _service_id,
-            "service-endpoint-provider": _service_endpoint_provider,
-            "external-ip": _external_ip
+            "service-endpoint-provider": service_endpoint_provider,
+            "external-ip": external_ip,
+            "connectivity-status": "Successfully established E2E connectivity",
+            "service-response": response_content
         }
         return {"message": message}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def check_service_connectivity(external_ip):
-    url = "http://" + external_ip  # IP of the requested federated service
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return True, response.content.decode('utf-8')
-    except requests.exceptions.RequestException:
-        pass
+async def check_service_connectivity(external_ip):
+    """
+    Checks connectivity to a federated service using its external IP.
 
-    return False, None
+    Returns a tuple of (connected: bool, response_content: str).
+    """
+    url = f"http://{external_ip}"  # URL of the requested federated service
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url)
+            if response.status_code == 200:
+                return True, response.text
+        except httpx.RequestError:
+            pass
+
+    return False, ""
 
 @app.get("/check_service_announcements",
          summary="Check announcements",
@@ -678,7 +685,7 @@ async def check_service_announcements_endpoint():
           summary="Place a bid",
           tags=["Provider Functions"],
           description="Endpoint to place a bid for a service")
-async def place_bid_endpoint(service_id: str, service_price: int):
+def place_bid_endpoint(service_id: str, service_price: int):
     global winnerChosen_event 
     try:
         winnerChosen_event  = PlaceBid(service_id, service_price)
@@ -727,7 +734,7 @@ async def check_bids_endpoint(service_id: str):
           summary="Choose provider",
           tags=["Consumer Functions"],
           description="Endpoint to choose a provider")
-async  def choose_provider_endpoint(bid_index: int):
+def choose_provider_endpoint(bid_index: int):
     global bids_event
     try:
         new_events = bids_event.get_all_entries()
@@ -767,7 +774,7 @@ async def check_winner_endpoint(service_id: str):
          summary="Check if I am winner",
          tags=["Provider Functions"],
          description="Endpoint to check if provider is the winner")
-async  def check_if_I_am_Winner_endpoint(service_id: str):
+async def check_if_I_am_Winner_endpoint(service_id: str):
     try:
         am_i_winner = CheckWinner(service_id)
         if am_i_winner == True:
@@ -783,7 +790,7 @@ async  def check_if_I_am_Winner_endpoint(service_id: str):
           summary="Deploy service",
           tags=["Provider Functions"],
           description="Endpoint for provider to deploy service")
-async def deploy_service_endpoint(service_id: str):
+def deploy_service_endpoint(service_id: str):
     try:
         if CheckWinner(service_id):
             create_resource_from_yaml(f"descriptors/{YAMLFile.federated_service}")
