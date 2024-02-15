@@ -3,8 +3,6 @@ import json
 import time
 import yaml
 import requests
-import httpx
-
 
 from dotenv import load_dotenv
 from web3 import Web3, HTTPProvider, WebsocketProvider
@@ -612,7 +610,7 @@ def create_service_announcement_endpoint():
     try:
         bids_event = AnnounceService()
         print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
-        return {"message": f"Service announcement sent to the SC (from {block_address})"}
+        return {"message": "Service announcement sent to the SC"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -638,7 +636,7 @@ async def check_service_state_endpoint(service_id: str):
 @app.get("/check_deployed_info/{service_id}",
          summary="Get deployed info",
          tags=["Default DLT Functions"],
-         description="Endpoint to get deployed info for a service and check e2e connectivity.") 
+         description="Endpoint to get deployed info for a service and check E2E connectivity.") 
 async def check_deployed_info_endpoint(service_id: str):
     try:
         # Service deployed info
@@ -647,7 +645,7 @@ async def check_deployed_info_endpoint(service_id: str):
         service_endpoint_provider = service_endpoint_provider.decode('utf-8')
 
         # Establish connectivity with the federated service
-        connected, response_content = await check_service_connectivity(external_ip)
+        connected, response_content = check_service_connectivity(external_ip)
         if not connected:
             print("Failed to establish connection with the federated service.")
             return {"error": "Failed to establish connection with the federated service."}
@@ -662,20 +660,19 @@ async def check_deployed_info_endpoint(service_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-async def check_service_connectivity(external_ip):
+def check_service_connectivity(external_ip):
     """
     Checks connectivity to a federated service using its external IP.
 
     Returns a tuple of (connected: bool, response_content: str).
     """
     url = f"http://{external_ip}"  # URL of the requested federated service
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(url)
-            if response.status_code == 200:
-                return True, response.text
-        except httpx.RequestError:
-            pass
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return True, response.text
+    except requests.RequestException:
+        pass
 
     return False, ""
 
@@ -736,7 +733,7 @@ def place_bid_endpoint(service_id: str, service_price: int):
     try:
         winnerChosen_event  = PlaceBid(service_id, service_price)
         print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
-        return {"message": f"Bid offer sent to the SC (from {block_address}"}
+        return {"message": "Bid offer sent to the SC"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -786,7 +783,7 @@ def choose_provider_endpoint(bid_index: int):
         new_events = bids_event.get_all_entries()
         for event in new_events:
             event_id = str(web3.toText(event['args']['_id'])).rstrip('\x00')
-            print("\n\033[1;32m(TX-3) Provider choosen! (bid index=" + str(bid_index) + ")\033[0m")
+            print("\n\033[1;32m(TX-3) Provider choosen! (bid index: " + str(bid_index) + ")\033[0m")
             ChooseProvider(bid_index)
             # Service closed (state 1)
         return {"message": f"Provider chosen!", "service-id": event_id, "bid-index": bid_index}    
@@ -870,5 +867,254 @@ def wait_for_service_ready(service_name, namespace="default", timeout=200):
 
 
 
-# -------------------------------------------- TEST DEPLOYMENT: DLT WITH OSM-K8s --------------------------------------------#
+
+def create_csv_file(role, header, data):
+    # Determine the base directory based on the role
+    base_dir = Path("experiments") / role
+    base_dir.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
+    
+    # Find the next available file index
+    existing_files = list(base_dir.glob("federation_events_{}_test_*.csv".format(role)))
+    indices = [int(f.stem.split('_')[-1]) for f in existing_files if f.stem.split('_')[-1].isdigit()]
+    next_index = max(indices) + 1 if indices else 1
+    
+    # Construct the file name
+    file_name = base_dir / f"federation_events_{role}_test_{next_index}.csv"
+    
+    # Open and write to the file
+    with open(file_name, 'w', encoding='UTF8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)  # Write the header
+        writer.writerows(data)  # Write the data
+
+    print(f"Data saved to {file_name}")
+
+# -------------------------------------------- TEST DEPLOYMENT --------------------------------------------#
+@app.get("/start_experiments_consumer", tags=["Test deployment: federation of a simple K8s service"])
+def start_experiments_consumer():
+    try:
+        header = ['step', 'timestamp']
+        data = []
+        
+        if domain == 'consumer':
+            
+            # Start time of the process
+            process_start_time = time.time()
+            
+            global bids_event
+            
+            # Service Announcement Sent
+            t_service_announced = time.time() - process_start_time
+            data.append(['service_announced', t_service_announced])
+            bids_event = AnnounceService()
+            print("\nSERVICE_ID:", service_id) # service + timestamp
+
+            print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
+
+            # Consumer AD wait for provider bids
+            bidderArrived = False
+
+            print("Waiting for bids...\n")
+            while bidderArrived == False:
+                new_events = bids_event.get_all_entries()
+                for event in new_events:
+                    
+                    # Bid Offer Received
+                    t_bid_offer_received = time.time() - process_start_time
+                    data.append(['bid_offer_received', t_bid_offer_received])
+
+                    event_id = str(web3.toText(event['args']['_id']))
+                    
+                    # Choosing provider
+                    # t_choosing_provider = time.time() - process_start_time
+                    # data.append(['choosing_provider', t_choosing_provider])
+
+                    # service id, service id, index of the bid
+                    print(service_id, web3.toText(event['args']['_id']), event['args']['max_bid_index'])
+                    print("BIDS ENTERED")
+                    bid_index = int(event['args']['max_bid_index'])
+                    bidderArrived = True 
+                    if int(bid_index) < 2:
+
+                        print("\nBids-info = [provider address , service price , bid index]\n")
+                        bid_info = GetBidInfo(int(bid_index-1))
+                        print(bid_info)
+                        
+                        # Provider choosen
+                        # t_provider_choosen = time.time() - process_start_time
+                        # data.append(['provider_choosen', t_provider_choosen])
+
+                        # Winner choosen sent
+                        t_winner_choosen = t_providerChoosen
+                        data.append(['winner_choosen', t_winner_choosen])
+                        
+                        ChooseProvider(int(bid_index)-1)
+                        print("\n\033[1;32m(TX-3) Provider choosen! (bid index=" + str(bid_index-1) + ")\033[0m")
+
+                        # Service closed (state 1)
+                        #DisplayServiceState(service_id)
+                        break
+
+            # Consumer AD wait for provider confirmation
+            serviceDeployed = False 
+            while serviceDeployed == False:
+                serviceDeployed = True if GetServiceState(service_id) == 2 else False
+            
+            # Confirmation received
+            t_confirm_deployment_received = time.time() - process_start_time
+            data.append(['confirm_deployment_received', t_confirm_deployment_received])
+            
+            # Service deployed info
+            external_ip, service_endpoint_provider = GetDeployedInfo(service_id)
+            
+            t_check_connectivity_federated_service_start = time.time() - process_start_time
+            data.append(['check_connectivity_federated_service_start', t_check_connectivity_federated_service_start])
+
+            external_ip = external_ip.decode('utf-8')
+            service_endpoint_provider = service_endpoint_provider.decode('utf-8')
+
+            print("Service deployed info:")
+            print("External IP:", external_ip)
+            print("Service endpoint provider:", service_endpoint_provider)
+
+
+            # Establish connectivity with the federated service
+            connected = False
+            while not connected:
+                connected, response_content = check_service_connectivity(external_ip)
+                if not connected:
+                    print("Failed to establish connection with the federated service. Retrying...")
+            
+            t_check_connectivity_federated_service_finished = time.time() - process_start_time
+            data.append(['check_connectivity_federated_service_finished', t_check_connectivity_federated_service_finished])
+
+            total_duration = time.time() - process_start_time
+
+            print("Successfully connected to the federated service")
+            print(response_content)
+
+            # Export the data to a csv file
+            create_csv_file(domain, header, data)
+
+            return {"message": f"Federation process completed in {total_duration:.2f} seconds"}
+        else:
+            error_message = "You must be consumer to run this code"
+            raise HTTPException(status_code=500, detail=error_message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))    
+
+@app.get("/start_experiments_provider", tags=["Test deployment: federation of a simple K8s service"])
+def start_experiments_provider():
+    try:
+        header = ['step', 'timestamp']
+        data = []
+        
+        if domain == 'provider':
+            
+            # Start time of the process
+            process_start_time = time.time()
+
+            global winnerChosen_event 
+            service_id = ''
+            print("\nSERVICE_ID:", service_id)
+
+            newService_event = ServiceAnnouncementEvent()
+            newService = False
+            open_services = []
+
+            # Provider AD wait for service announcements
+            while newService == False:
+                new_events = newService_event.get_all_entries()
+                for event in new_events:
+                    service_id = web3.toText(event['args']['id'])
+                    
+                    requirements = web3.toText(event['args']['requirements'])
+
+                    requested_service = requirements.split("=")[1]
+                    # Removes null characters at the end of the string
+                    requested_service = requested_service.rstrip('\x00') 
+                    
+                    if GetServiceState(service_id) == 0:
+                        open_services.append(service_id)
+                print("OPEN =", len(open_services)) 
+                if len(open_services) > 0:
+                    
+                    # Announcement received
+                    t_announce_received = time.time() - process_start_time
+                    data.append(['announce_received', t_announce_received])
+
+                    print('Announcement received:')
+                    print(new_events)
+                    print("\n\033[1;33mRequested service: " + repr(requested_service) + "\033[0m")
+                    newService = True
+                
+            service_id = open_services[-1]
+
+            # Place a bid offer to the Federation SC
+            t_bid_offer_sent = time.time() - process_start_time
+            data.append(['bid_offer_sent', t_bid_offer_sent])
+            winnerChosen_event = PlaceBid(service_id, 10)
+
+            print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
+            
+            # Ask to the Federation SC if there is a winner (wait...)
+        
+            winnerChosen = False
+            while winnerChosen == False:
+                new_events = winnerChosen_event.get_all_entries()
+                for event in new_events:
+                    event_serviceid = web3.toText(event['args']['_id'])
+                    if event_serviceid == service_id:
+                        
+                        # Winner choosen received
+                        t_winner_received = time.time() - process_start_time
+                        data.append(['winner_received', t_winner_received])
+                        print("There is a winner")
+                        winnerChosen = True
+                        break
+            
+            am_i_winner = False
+            while am_i_winner == False:
+                # Provider AD ask if he is the winner
+                am_i_winner = CheckWinner(service_id)
+                if am_i_winner == True:
+                    # Start deployment of the requested federated service
+                    t_deployment_start = time.time() - process_start_time
+                    data.append(['deployment_start', t_deployment_start])
+                    print("I am the winner")
+                    break
+
+            # Deployment of the K8s service
+            create_k8s_resource_from_yaml(f"descriptors/{YAMLFile.federated_service}")
+
+            # Wait for the service to be ready and get the external IP
+            external_ip = wait_for_service_ready("federated-service") 
+
+            # Deployment finished
+            t_deployment_finished = time.time() - process_start_time
+            data.append(['deployment_finished', t_deployment_finished])
+                
+            # Deployment confirmation sent
+            t_confirm_deployment_sent = time.time() - process_start_time
+            data.append(['confirm_deployment_sent', t_confirm_deployment_sent])
+            ServiceDeployed(service_id, external_ip)
+
+            total_duration = time.time() - process_start_time
+                
+            print("\n\033[1;32m(TX-4) Service deployed\033[0m")
+            print("External IP:", external_ip)
+            DisplayServiceState(service_id)
+                
+            # Export the data to a csv file
+            create_csv_file(domain, header, data)
+
+            # Delete all K8s resources
+            delete_all_k8s_resources()
+
+            return {"message": f"Federation process completed in {total_duration:.2f} seconds"}
+        else:
+            error_message = "You must be provider to run this code"
+            raise HTTPException(status_code=500, detail=error_message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))    
 # ------------------------------------------------------------------------------------------------------------------------------#
