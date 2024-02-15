@@ -215,7 +215,7 @@ def AnnounceService():
         Filter: A filter for catching the 'NewBid' event that is emitted when a new bid is placed for the announced service.
     """
     global service_id
-    # service_id = 'service' + str(int(time.time()))
+    service_id = 'service' + str(int(time.time()))
     announce_transaction = Federation_contract.functions.AnnounceService(
         _requirements=web3.toBytes(text=service_requirements),
         _endpoint_consumer=web3.toBytes(text=service_endpoint_consumer),
@@ -399,7 +399,7 @@ def DisplayServiceState(service_id):
     else:
         print(f"Error: state for service {service_id} is {current_service_state}")
 
-def create_resource_from_yaml(yaml_file_path):
+def create_k8s_resource_from_yaml(yaml_file_path):
     """
     Creates a Kubernetes resource (Pod, Service, Deployment) from a specified YAML file.
 
@@ -434,7 +434,7 @@ def create_resource_from_yaml(yaml_file_path):
         print(f"Unexpected error: {e}")
         raise
 
-def delete_resource_from_yaml(yaml_file_path):
+def delete_k8s_resource_from_yaml(yaml_file_path):
     """
     Deletes a Kubernetes resource (Pod, Service, Deployment) specified in a YAML file.
 
@@ -471,6 +471,40 @@ def delete_resource_from_yaml(yaml_file_path):
         print(f"Unexpected error during deletion: {e}")
         raise
 
+def delete_all_k8s_resources(namespace='default'):
+    """
+    Deletes all Pods, Deployments, and Services (except Services with type ClusterIP) in the specified namespace.
+
+    Parameters:
+    - namespace: The namespace from which to delete the resources. Defaults to 'default'.
+    """
+
+    try:
+        # Delete all Pods
+        pods = api_instance_coreV1.list_namespaced_pod(namespace)
+        for pod in pods.items:
+            api_instance_coreV1.delete_namespaced_pod(name=pod.metadata.name, namespace=namespace)
+            print(f"Pod '{pod.metadata.name}' deleted from namespace '{namespace}'.")
+
+        # Delete all Deployments
+        deployments = api_instance_appsV1.list_namespaced_deployment(namespace)
+        for deployment in deployments.items:
+            api_instance_appsV1.delete_namespaced_deployment(name=deployment.metadata.name, namespace=namespace)
+            print(f"Deployment '{deployment.metadata.name}' deleted from namespace '{namespace}'.")
+
+        # Delete all Services, except those with type ClusterIP
+        services = api_instance_coreV1.list_namespaced_service(namespace)
+        for service in services.items:
+            if service.spec.type != "ClusterIP":
+                api_instance_coreV1.delete_namespaced_service(name=service.metadata.name, namespace=namespace)
+                print(f"Service '{service.metadata.name}' deleted from namespace '{namespace}'.")
+
+    except ApiException as e:
+        print(f"Exception when calling Kubernetes API for deletion: {e}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error during deletion: {e}")
+        raise
 
 # -------------------------------------------- K8S API FUNCTIONS --------------------------------------------#
 @app.post("/create_resource", tags=["K8s Functions"], summary="Create K8s resource from yaml file")
@@ -483,7 +517,7 @@ async def create_resource_endpoint(yaml_file: YAMLFile):
 
     try:
         # Assuming create_resource_from_yaml is a function you've defined to handle the creation
-        create_resource_from_yaml(yaml_file_path)
+        create_k8s_resource_from_yaml(yaml_file_path)
         return {"message": f"Resource creation initiated from {yaml_file.value}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -501,8 +535,20 @@ async def delete_resource_endpoint(yaml_file: YAMLFile):
 
     try:
         # Call the deletion function
-        delete_resource_from_yaml(yaml_file_path)
+        delete_k8s_resource_from_yaml(yaml_file_path)
         return {"message": f"Deletion initiated for resource defined in {yaml_file.value}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/delete_all_resources", tags=["K8s Functions"], summary="Delete all K8s resources")
+async def delete_all_resources_endpoint():
+    """
+    Endpoint to delete a all Kubernetes resources in the cluster.
+    """
+    try:
+        # Call the deletion function
+        delete_all_k8s_resources()
+        return {"message": f"Deleting all resources in the K8s cluster"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 # ------------------------------------------------------------------------------------------------------------------------------#
