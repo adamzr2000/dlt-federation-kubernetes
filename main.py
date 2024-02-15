@@ -945,7 +945,7 @@ def start_experiments_consumer():
                         # data.append(['provider_choosen', t_provider_choosen])
 
                         # Winner choosen sent
-                        t_winner_choosen = t_providerChoosen
+                        t_winner_choosen = time.time() - process_start_time
                         data.append(['winner_choosen', t_winner_choosen])
                         
                         ChooseProvider(int(bid_index)-1)
