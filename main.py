@@ -1090,7 +1090,7 @@ def start_experiments_provider():
                     # Start deployment of the requested federated service
                     t_deployment_start = time.time() - process_start_time
                     data.append(['deployment_start', t_deployment_start])
-                    print("I am the winner")
+                    # print("I am the winner")
                     break
 
             # Deployment of the K8s service
