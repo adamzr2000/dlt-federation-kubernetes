@@ -21,11 +21,13 @@ Follow these steps to build the necessary Docker images:
 ```bash
 cd docker-images
 ```
-2.2. For each of the following subdirectories (`dlt-node`, `truffle`), execute the `build.sh` script. Example:
+2.2. For each of the following subdirectories (`dlt-node`, `truffle`, `eth-netstats`), execute the `build.sh` script. Example:
 ```bash
 cd ../dlt-node
 ./build.sh
 cd ../truffle
+./build.sh
+cd ../eth-netstats
 ./build.sh
 ```
 
@@ -36,7 +38,9 @@ pip install -r requirements.txt
 
 ## Usage 
 
-1. Create a private Blockchain Network (Ethereum Network based on container Geth nodes)
+1. Creating a DLT Network
+
+Initiate your private Ethereum Network, which relies on containerized Geth nodes, by running:
 
 *Both VMs must have access to blockchain nodes of this network (10.5.50.X/16)*
 
@@ -44,7 +48,10 @@ pip install -r requirements.txt
 ./start_dlt_network.sh
 ```
 
-2. Joint the DLT network from AD2
+2. Joining the DLT Network
+
+To join the DLT network from a second node, execute:
+
 ```bash
 ./join_dlt_network.sh
 ```
@@ -60,8 +67,10 @@ docker exec -it node1 geth --exec "net.peerCount" attach ws://10.5.50.70:3334
 docker exec -it node1 geth --exec "net.peerCount" attach ws://10.5.50.71:3335
 ```
 
-Each command should display 1 peers, indicating that the nodes have successfully connected to each other.
+Each command should report `1 peer`, indicating that the nodes have successfully connected to each other.
 
+
+Access the [eth-netsats](http://10.5.50.70:3000) web interface for additional information.
 
 2. Deploy the Federation Smart Contract to the Blockchain Network:
 ```bash
