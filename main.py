@@ -507,8 +507,8 @@ def delete_all_k8s_resources(namespace='default'):
         raise
 
 # -------------------------------------------- K8S API FUNCTIONS --------------------------------------------#
-@app.post("/create_resource", tags=["K8s Functions"], summary="Create K8s resource from yaml file")
-async def create_resource_endpoint(yaml_file: YAMLFile):
+@app.post("/create_k8s_resource", tags=["K8s Functions"], summary="Create K8s resource from yaml file")
+async def create_k8s_resource_endpoint(yaml_file: YAMLFile):
     """
     Endpoint to create a Kubernetes resource based on selected YAML file.
     """
@@ -522,8 +522,8 @@ async def create_resource_endpoint(yaml_file: YAMLFile):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/delete_resource", tags=["K8s Functions"], summary="Delete K8s resource from yaml file")
-async def delete_resource_endpoint(yaml_file: YAMLFile):
+@app.delete("/delete_k8s_resource", tags=["K8s Functions"], summary="Delete K8s resource from yaml file")
+async def delete_k8s_resource_endpoint(yaml_file: YAMLFile):
     """
     Endpoint to delete a Kubernetes resource based on selected YAML file.
     """
@@ -540,8 +540,8 @@ async def delete_resource_endpoint(yaml_file: YAMLFile):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/delete_all_resources", tags=["K8s Functions"], summary="Delete all K8s resources")
-async def delete_all_resources_endpoint():
+@app.delete("/delete_all_k8s_resources", tags=["K8s Functions"], summary="Delete all K8s resources")
+async def delete_all_k8s_resources_endpoint():
     """
     Endpoint to delete a all Kubernetes resources in the cluster.
     """
@@ -612,7 +612,7 @@ def create_service_announcement_endpoint():
     try:
         bids_event = AnnounceService()
         print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
-        return {"message": f"Service announcement sent to the SC (from {block_address}"}
+        return {"message": f"Service announcement sent to the SC (from {block_address})"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -839,7 +839,7 @@ async def check_if_I_am_Winner_endpoint(service_id: str):
 def deploy_service_endpoint(service_id: str):
     try:
         if CheckWinner(service_id):
-            create_resource_from_yaml(f"descriptors/{YAMLFile.federated_service}")
+            create_k8s_resource_from_yaml(f"descriptors/{YAMLFile.federated_service}")
 
             # Wait for the service to be ready and get the external IP
             external_ip = wait_for_service_ready("federated-service") 
