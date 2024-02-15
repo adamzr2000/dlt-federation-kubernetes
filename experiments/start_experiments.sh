@@ -10,10 +10,7 @@ PROVIDER_ENDPOINT="${BASE_URL_PROVIDER}/start_experiments_provider?export_to_csv
 DELETE_RESOURCES_ENDPOINT="${BASE_URL_PROVIDER}/delete_all_k8s_resources"
 
 # Directory to store logs
-LOGS_DIR="experiments/logs"
-
-# Ensure the logs directory exists
-mkdir -p "$LOGS_DIR"
+LOGS_DIR="logs"
 
 # Ask the user for the number of tests to run
 read -p "Enter the number of tests to run (1-20): " num_tests
@@ -37,7 +34,7 @@ function start_experiments {
     sleep 2
 
     # Once the consumer experiment is done, delete all resources on the provider and save the log
-    wget -O "${LOGS_DIR}/delete_resources_output_${timestamp}.txt" "$DELETE_RESOURCES_ENDPOINT"
+    wget -O "${LOGS_DIR}/delete_k8s_resources_output_${timestamp}.txt" "$DELETE_RESOURCES_ENDPOINT"
     sleep 4
 }
 
