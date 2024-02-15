@@ -24,7 +24,7 @@ fi
 # Function to start experiments
 function start_experiments {
     # Timestamp for file naming
-    local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+    local timestamp=$1
 
     # Start the provider experiment in the background and save the log
     curl -X POST "${PROVIDER_ENDPOINT}" -d "export_to_csv=true" -o "${LOGS_DIR}/provider_output_${timestamp}.txt" &
@@ -36,7 +36,7 @@ function start_experiments {
     wait
 
     # Once the consumer experiment is done, delete all resources on the provider and save the log
-    curl -X DELETE "$DELETE_RESOURCES_ENDPOINT" -o "${LOGS_DIR}/delete_resources_output_${timestamp}.txt"
+    curl -X DELETE "$DELETE_RESOURCES_ENDPOINT" 
     sleep 4
 }
 
@@ -44,7 +44,7 @@ function start_experiments {
 for ((i=1; i<=num_tests; i++))
 do
     echo "Starting experiment $i of $num_tests..."
-    start_experiments
+    start_experiments $i
     echo "Experiment $i completed."
 done
 
