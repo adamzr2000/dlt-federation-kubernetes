@@ -981,12 +981,19 @@ def start_experiments_consumer():
 
 
             # Establish connectivity with the federated service
+            retry_limit = 5  # Maximum number of connection attempts
+            retry_count = 0
             connected = False
-            while not connected:
+            while not connected and retry_count < retry_limit:
                 connected, response_content = check_service_connectivity(external_ip)
                 if not connected:
                     print("Failed to establish connection with the federated service. Retrying...")
-            
+                    retry_count += 1
+                    time.sleep(2)  # Wait for 2 seconds before retrying
+            if not connected:
+                print(f"Unable to establish connection with the federated service after {retry_limit} attempts.")
+                return {"error": f"Failed to establish connection with the federated service after {retry_limit} attempts."}
+
             t_check_connectivity_federated_service_finished = time.time() - process_start_time
             data.append(['check_connectivity_federated_service_finished', t_check_connectivity_federated_service_finished])
 
@@ -1111,7 +1118,7 @@ def start_experiments_provider():
             create_csv_file(domain, header, data)
 
             # Delete all K8s resources
-            delete_all_k8s_resources()
+            # delete_all_k8s_resources()
 
             return {"message": f"Federation process completed in {total_duration:.2f} seconds"}
         else:
