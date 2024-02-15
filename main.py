@@ -469,7 +469,7 @@ def delete_resource_from_yaml(yaml_file_path):
 
 
 # -------------------------------------------- K8S API FUNCTIONS --------------------------------------------#
-@app.post("/create_resource", tags=["K8s Functions"])
+@app.post("/create_resource", tags=["K8s Functions"], summary="Create K8s resource from yaml file")
 async def create_resource_endpoint(yaml_file: YAMLFile):
     """
     Endpoint to create a Kubernetes resource based on selected YAML file.
@@ -484,7 +484,7 @@ async def create_resource_endpoint(yaml_file: YAMLFile):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/delete_resource", tags=["K8s Functions"])
+@app.delete("/delete_resource", tags=["K8s Functions"], summary="Delete K8s resource from yaml file")
 async def delete_resource_endpoint(yaml_file: YAMLFile):
     """
     Endpoint to delete a Kubernetes resource based on selected YAML file.
@@ -562,7 +562,7 @@ async def create_service_announcement_endpoint():
     try:
         bids_event = AnnounceService()
         print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
-        return {"message": "Service announcement sent to the SC", "from": f"{domain_name} - {block_address}"}
+        return {"message": f"Service announcement sent to the SC (from {block_address}"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -683,7 +683,7 @@ async def place_bid_endpoint(service_id: str, service_price: int):
     try:
         winnerChosen_event  = PlaceBid(service_id, service_price)
         print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
-        return {"message": f"Bid offer sent to the SC, from {block_address}, price={service_price} ₿"}
+        return {"message": f"Bid offer sent to the SC (from {block_address}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
