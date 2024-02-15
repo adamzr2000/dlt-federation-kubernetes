@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: federated-pod
+  labels:
+    app: nginx  # Label to target this Pod with a Service
+spec:
+  containers:
+  - name: nginx-pod
+    image: nginx:alpine
+    ports:
+    - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: federated-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx # Label to target Pods with a Service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
