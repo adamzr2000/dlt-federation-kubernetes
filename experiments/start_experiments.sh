@@ -27,14 +27,16 @@ function start_experiments {
     local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
 
     # Start the provider experiment in the background and save the log
-    wget -O "${LOGS_DIR}/provider_output_${timestamp}.txt" "$PROVIDER_ENDPOINT" &
+    curl -X POST "${PROVIDER_ENDPOINT}" -d "export_to_csv=true" -o "${LOGS_DIR}/provider_output_${timestamp}.txt" &
 
     # Start the consumer experiment, wait for it to finish, and save the log
-    wget -O "${LOGS_DIR}/consumer_output_${timestamp}.txt" "$CONSUMER_ENDPOINT"
-    sleep 2
+    curl -X POST "${CONSUMER_ENDPOINT}" -d "export_to_csv=true" -o "${LOGS_DIR}/consumer_output_${timestamp}.txt"
+
+    # Ensure background processes have finished
+    wait
 
     # Once the consumer experiment is done, delete all resources on the provider and save the log
-    wget -O "${LOGS_DIR}/delete_k8s_resources_output_${timestamp}.txt" "$DELETE_RESOURCES_ENDPOINT"
+    curl -X DELETE "$DELETE_RESOURCES_ENDPOINT" -o "${LOGS_DIR}/delete_resources_output_${timestamp}.txt"
     sleep 4
 }
 

@@ -888,7 +888,7 @@ def create_csv_file(role, header, data):
     print(f"Data saved to {file_name}")
 
 # -------------------------------------------- TEST DEPLOYMENT --------------------------------------------#
-@app.get("/start_experiments_consumer", tags=["Test deployment: federation of a simple K8s service"])
+@app.post("/start_experiments_consumer", tags=["Test deployment: federation of a simple K8s service"])
 def start_experiments_consumer(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
@@ -1012,7 +1012,7 @@ def start_experiments_consumer(export_to_csv: bool = False):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))    
 
-@app.get("/start_experiments_provider", tags=["Test deployment: federation of a simple K8s service"])
+@app.post("/start_experiments_provider", tags=["Test deployment: federation of a simple K8s service"])
 def start_experiments_provider(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
