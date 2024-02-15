@@ -866,10 +866,6 @@ def wait_for_service_ready(service_name, namespace="default", timeout=200):
 # ------------------------------------------------------------------------------------------------------------------------------#
 
 
-
-
-
-
 def create_csv_file(role, header, data):
     # Determine the base directory based on the role
     base_dir = Path("experiments") / role
@@ -893,7 +889,7 @@ def create_csv_file(role, header, data):
 
 # -------------------------------------------- TEST DEPLOYMENT --------------------------------------------#
 @app.get("/start_experiments_consumer", tags=["Test deployment: federation of a simple K8s service"])
-def start_experiments_consumer():
+def start_experiments_consumer(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
         data = []
@@ -1002,8 +998,12 @@ def start_experiments_consumer():
             print("Successfully connected to the federated service")
             print(response_content)
 
-            # Export the data to a csv file
-            create_csv_file(domain, header, data)
+            if export_to_csv:
+                # Export the data to a csv file only if export_to_csv is True
+                create_csv_file(domain, header, data)
+                print(f"Data exported to CSV for {domain}.")
+            else:
+                print("CSV export not requested.")
 
             return {"message": f"Federation process completed in {total_duration:.2f} seconds"}
         else:
@@ -1013,7 +1013,7 @@ def start_experiments_consumer():
         raise HTTPException(status_code=500, detail=str(e))    
 
 @app.get("/start_experiments_provider", tags=["Test deployment: federation of a simple K8s service"])
-def start_experiments_provider():
+def start_experiments_provider(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
         data = []
@@ -1114,8 +1114,12 @@ def start_experiments_provider():
             print("External IP:", external_ip)
             DisplayServiceState(service_id)
                 
-            # Export the data to a csv file
-            create_csv_file(domain, header, data)
+            if export_to_csv:
+                # Export the data to a csv file only if export_to_csv is True
+                create_csv_file(domain, header, data)
+                print(f"Data exported to CSV for {domain}.")
+            else:
+                print("CSV export not requested.")
 
             # Delete all K8s resources
             # delete_all_k8s_resources()
