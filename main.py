@@ -3,6 +3,8 @@ import json
 import time
 import yaml
 import requests
+import csv
+from pathlib import Path
 
 from dotenv import load_dotenv
 from web3 import Web3, HTTPProvider, WebsocketProvider
