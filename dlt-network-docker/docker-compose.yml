@@ -17,3 +17,10 @@ services:
     env_file: .env
     command: ./node1_start.sh
     network_mode: "host"
+
+  eth-netstats:
+    image: eth-netstats
+    container_name: eth-netstats
+    depends_on:
+      - node1
+    network_mode: "host"

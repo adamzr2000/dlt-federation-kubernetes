@@ -44,6 +44,25 @@ pip install -r requirements.txt
 ./start_dlt_network.sh
 ```
 
+2. Joint the DLT network from AD2
+```bash
+./join_dlt_network.sh
+```
+
+## Verifying Node Association
+
+After starting the DLT network, you can verify that the nodes have associated correctly by executing the following commands:
+```bash
+docker exec -it node1 geth --exec "net.peerCount" attach ws://10.5.50.70:3334
+```
+
+```bash
+docker exec -it node1 geth --exec "net.peerCount" attach ws://10.5.50.71:3335
+```
+
+Each command should display 1 peers, indicating that the nodes have successfully connected to each other.
+
+
 2. Deploy the Federation Smart Contract to the Blockchain Network:
 ```bash
 cd smart-contracts
