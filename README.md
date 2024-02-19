@@ -45,6 +45,7 @@ Initiate your private Ethereum Network, which relies on containerized Geth nodes
 *Both VMs must have access to blockchain nodes of this network (10.5.50.X/16)*
 
 ```bash
+cd dlt-network-docker
 ./start_dlt_network.sh
 ```
 
@@ -64,7 +65,7 @@ docker exec -it node1 geth --exec "net.peerCount" attach ws://10.5.50.70:3334
 ```
 
 ```bash
-docker exec -it node1 geth --exec "net.peerCount" attach ws://10.5.50.71:3335
+docker exec -it node2 geth --exec "net.peerCount" attach ws://10.5.50.71:3335
 ```
 
 Each command should report `1 peer`, indicating that the nodes have successfully connected to each other.
