@@ -59,19 +59,29 @@ plt.figure(figsize=(12, 8))
 x_ticks = np.arange(len(ordered_steps))
 bar_colors = plt.cm.viridis(np.linspace(0.3, 0.9, len(ordered_steps)))  # Use a colormap for varied but harmonious colors
 
+
+# Adjusting the loop to ensure labels are added only once
 for i, row in times_df.iterrows():
     step = row['Step']
     mean_duration = row['Mean Duration']
     std_duration = row['Std Duration']
-    plt.bar(x_ticks[i], mean_duration, color=bar_colors[i], edgecolor='grey', yerr=std_duration, capsize=5, error_kw={'elinewidth':2, 'ecolor':'tomato'})
-    # Adjust text position to be above the standard deviation line and include error
-    text_position = mean_duration + std_duration + 0.05 * (mean_duration + std_duration)  # Slightly above the error bar
+    
+    # Apply labels only for the first iteration to avoid duplication
+    if i == 0:
+        plt.bar(x_ticks[i], mean_duration, color=bar_colors[i], edgecolor='grey', yerr=std_duration, capsize=5, error_kw={'elinewidth':2, 'ecolor':'tomato'}, label='Mean Duration')
+        plt.errorbar(x_ticks[i], mean_duration, yerr=std_duration, fmt='none', ecolor='tomato', elinewidth=2, capsize=5, label='Standard Deviation')
+    else:
+        plt.bar(x_ticks[i], mean_duration, color=bar_colors[i], edgecolor='grey', yerr=std_duration, capsize=5, error_kw={'elinewidth':2, 'ecolor':'tomato'})
+        plt.errorbar(x_ticks[i], mean_duration, yerr=std_duration, fmt='none', ecolor='tomato', elinewidth=2, capsize=5)
+
+    text_position = mean_duration + std_duration + 0.05 * (mean_duration + std_duration)
     plt.text(x_ticks[i], text_position, f"{mean_duration:.2f}s ± {std_duration:.2f}", va='bottom', ha='center', color='black', fontweight='bold')
 
 plt.xticks(x_ticks, ordered_steps, rotation=45, ha='right')
 plt.ylabel('Time (s)')
 plt.xlabel('Phases')
 plt.title('Mean durations and standard deviation of each federation step')
+plt.legend()
 plt.tight_layout()
 plt.savefig('federation_events_mean_std_v2.png')
 plt.show()
