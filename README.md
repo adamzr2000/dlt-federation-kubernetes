@@ -99,7 +99,8 @@ Provider API documentation at: [http://10.5.50.71:8000/docs](http://10.5.50.71:8
 ```bash
 microk8s enable metallb
 
-<Enter each IP address range (e.g. 10.5.50.80-10.5.50.90)>
+<Enter IP address range>
+(e.g. 10.5.50.80-10.5.50.90)
 ```
 
 2. Verify the installation: Use the following commands to check if the MetalLB driver is running:
