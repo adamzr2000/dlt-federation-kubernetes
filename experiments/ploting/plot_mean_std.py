@@ -78,7 +78,7 @@ plt.xlabel('Phases')
 plt.title('Mean durations and standard deviation of each federation step')
 plt.legend()
 plt.tight_layout()
-plt.savefig('federation_events_mean_std.png')
+plt.savefig('federation_events_mean_std.pdf')
 plt.show()
 
 
