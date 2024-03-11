@@ -67,7 +67,7 @@ def check_pods_terminated(prefixes):
 
 # Function to deploy object detection service
 def deploy_object_detection_service():
-    dir_path = "../kubernetes_examples/6g-latency-sensitive-service/chart"
+    dir_path = "../6g-latency-sensitive-service/chart"
     try:
         # Helm install commands for app-services and app-core
         subprocess.run(["helm", "install", "app-services", "./app", "-f", "./app/values/service-values.yaml"], cwd=dir_path, check=True)

@@ -506,104 +506,6 @@ def delete_all_k8s_resources(namespace='default'):
         print(f"Unexpected error during deletion: {e}")
         raise
 
-# Function to deploy object detection service
-def deploy_object_detection_service():
-    dir_path = "../6g-latency-sensitive-service/chart"
-    try:
-        # Helm install commands for app-services and app-core
-        subprocess.run(["helm", "install", "app-services", "./app", "-f", "./app/values/service-values.yaml"], cwd=dir_path, check=True)
-        print("Services were applied successfully.")
-
-        # Wait for the mediamtx_service IP 
-        mediamtx_service_ip = wait_for_service_ready("mediamtx-service")
-        if mediamtx_service_ip is None:
-            print("Failed to obtain mediamtx_service IP.")
-            return None
-        print(f"Found mediamtx_service IP: {mediamtx_service_ip}")
-        
-        subprocess.run(["helm", "install", "app-core", "./app", "-f", "./app/values/config-map-values.yaml", "-f", "./app/values/deployment-values.yaml"], cwd=dir_path, check=True)
-        print("Configmaps and deployments were applied successfully.")
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to apply services: {e}")
-        return None
-
-    print("\nConfiguration completed successfully.")
-    return mediamtx_service_ip
-
-
-# Function to delete object detection service
-def delete_object_detection_service():
-    try:
-        # Uninstall Helm releases for app-core and app-services
-        subprocess.run(["helm", "uninstall", "app-core"], check=True)
-        print("Release \"app-core\" uninstalled.")
-        subprocess.run(["helm", "uninstall", "app-services"], check=True)
-        print("Release \"app-services\" uninstalled.")
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to uninstall services: {e}")
-        return
-
-    # Wait for all deployments to terminate
-    wait_for_pods_terminated([
-        "frontend-",
-        "object-detector-",
-        "sampler-sender-",
-        "receiver-encoder-publisher-",
-        "mediamtx-"
-    ])
-
-# Function to check and wait for the service to get an external IP
-def wait_for_service_ready(service_name, namespace="default", timeout=200):
-    start_time = time.time()
-    while True:
-        elapsed_time = time.time() - start_time
-        if elapsed_time > timeout:
-            raise TimeoutError("Timed out waiting for service to be ready.")
-
-        service = api_instance_coreV1.read_namespaced_service(name=service_name, namespace=namespace)
-        ingress = service.status.load_balancer.ingress
-        if ingress and ingress[0].ip:
-            return ingress[0].ip
-
-# Function to wait for specific pods to terminate
-def wait_for_pods_terminated(prefixes):
-    while True:
-        pods = api_instance_coreV1.list_pod_for_all_namespaces().items
-        active_pods = [
-            pod for pod in pods
-            if any(pod.metadata.name.startswith(prefix) for prefix in prefixes)
-        ]
-
-        if not active_pods:
-            print("All specified pods have been terminated.")
-            break
-        else:
-            remaining_pods = [pod.metadata.name for pod in active_pods]
-            print(f"Waiting for specific pods to terminate: {remaining_pods}")
-            time.sleep(2)
-
-def create_csv_file(role, header, data):
-    # Determine the base directory based on the role
-    base_dir = Path("experiments") / role
-    base_dir.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
-
-    # Find the next available file index
-    existing_files = list(base_dir.glob("federation_events_{}_test_*.csv".format(role)))
-    indices = [int(f.stem.split('_')[-1]) for f in existing_files if f.stem.split('_')[-1].isdigit()]
-    next_index = max(indices) + 1 if indices else 1
-
-    # Construct the file name
-    file_name = base_dir / f"federation_events_{role}_test_{next_index}.csv"
-
-    # Open and write to the file
-    with open(file_name, 'w', encoding='UTF8', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(header)  # Write the header
-        writer.writerows(data)  # Write the data
-
-    print(f"Data saved to {file_name}")
-
-
 # -------------------------------------------- K8S API FUNCTIONS --------------------------------------------#
 @app.post("/create_k8s_resource", tags=["K8s Functions"], summary="Create K8s resource from yaml file")
 def create_k8s_resource_endpoint(yaml_file: YAMLFile):
@@ -622,7 +524,7 @@ def create_k8s_resource_endpoint(yaml_file: YAMLFile):
 
 @app.delete("/delete_k8s_resource", tags=["K8s Functions"], summary="Delete K8s resource from yaml file")
 def delete_k8s_resource_endpoint(yaml_file: YAMLFile):
-DELETE_RESOURCES_ENDPOINT    """
+    """
     Endpoint to delete a Kubernetes resource based on selected YAML file.
     """
     yaml_file_path = f"descriptors/{yaml_file.value}"
@@ -647,28 +549,6 @@ def delete_all_k8s_resources_endpoint():
         # Call the deletion function
         delete_all_k8s_resources()
         return {"message": f"Deleting all resources in the K8s cluster"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/deploy_object_detection_service", tags=["K8s Functions"], summary="Deploy object detection service")
-def deploy_object_detection_service_endpoint():
-    """
-    Endpoint to create object detection service
-    """
-    try:
-        mediamtx_service_ip = deploy_object_detection_service()
-        return {"message": f"Service deployed. Mediamtx service IP = {mediamtx_service_ip}"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/delete_object_detection_service", tags=["K8s Functions"], summary="Delete object detection service")
-def delete_object_detection_service_endpoint():
-    """
-    Endpoint to delete object detection service
-    """
-    try:
-        delete_object_detection_service()
-        return {"message": f"Service deleted."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 # ------------------------------------------------------------------------------------------------------------------------------#
@@ -845,7 +725,7 @@ async def check_service_announcements_endpoint():
             return {"No new events found": "No new services announced in the last 20 blocks."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-DELETE_RESOURCES_ENDPOINT
+
 @app.post("/place_bid/{service_id}-{service_price}",
           summary="Place a bid",
           tags=["Provider Functions"],
@@ -970,6 +850,44 @@ def deploy_service_endpoint(service_id: str):
             return {"message": "You are not the winner"}   
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))    
+
+# Function to check and wait for the service to get an external IP
+def wait_for_service_ready(service_name, namespace="default", timeout=200):
+    start_time = time.time()
+    while True:
+        elapsed_time = time.time() - start_time
+        if elapsed_time > timeout:
+            raise TimeoutError("Timed out waiting for service to be ready.")
+        
+        service = api_instance_coreV1.read_namespaced_service(name=service_name, namespace=namespace)
+        ingress = service.status.load_balancer.ingress
+        if ingress and ingress[0].ip:
+            return ingress[0].ip      
+# ------------------------------------------------------------------------------------------------------------------------------#
+
+
+def create_csv_file(role, header, data):
+    # Determine the base directory based on the role
+    base_dir = Path("experiments") / role
+    base_dir.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
+    
+    # Find the next available file index
+    existing_files = list(base_dir.glob("federation_events_{}_test_*.csv".format(role)))
+    indices = [int(f.stem.split('_')[-1]) for f in existing_files if f.stem.split('_')[-1].isdigit()]
+    next_index = max(indices) + 1 if indices else 1
+    
+    # Construct the file name
+    file_name = base_dir / f"federation_events_{role}_test_{next_index}.csv"
+    
+    # Open and write to the file
+    with open(file_name, 'w', encoding='UTF8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)  # Write the header
+        writer.writerows(data)  # Write the data
+
+    print(f"Data saved to {file_name}")
+
+# -------------------------------------------- TEST DEPLOYMENT --------------------------------------------#
 @app.post("/start_experiments_consumer", tags=["Test deployment: federation of a simple K8s service"])
 def start_experiments_consumer(export_to_csv: bool = False):
     try:
@@ -1061,8 +979,7 @@ def start_experiments_consumer(export_to_csv: bool = False):
             # Establish connectivity with the federated service
             retry_limit = 5  # Maximum number of connection attempts
             retry_count = 0
-            connected = True
-            # connected = False
+            connected = False
             while not connected and retry_count < retry_limit:
                 connected, response_content = check_service_connectivity(external_ip)
                 if not connected:
@@ -1177,11 +1094,10 @@ def start_experiments_provider(export_to_csv: bool = False):
                     break
 
             # Deployment of the K8s service
-            #create_k8s_resource_from_yaml(f"descriptors/{YAMLFile.federated_service}")
+            create_k8s_resource_from_yaml(f"descriptors/{YAMLFile.federated_service}")
 
             # Wait for the service to be ready and get the external IP
-            #external_ip = wait_for_service_ready("federated-service") 
-            external_ip = deploy_object_detection_service()
+            external_ip = wait_for_service_ready("federated-service") 
 
             # Deployment finished
             t_deployment_finished = time.time() - process_start_time
