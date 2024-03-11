@@ -1081,7 +1081,7 @@ def start_experiments_consumer(export_to_csv: bool = False):
             total_duration = time.time() - process_start_time
 
             print("Successfully connected to the federated service")
-            print(response_content)
+            # print(response_content)
 
             if export_to_csv:
                 # Export the data to a csv file only if export_to_csv is True
