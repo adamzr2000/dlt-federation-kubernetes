@@ -1,7 +1,0 @@
-step,timestamp
-service_announced,4.76837158203125e-07
-bid_offer_received,5.8815271854400635
-winner_choosen,5.8866846561431885
-confirm_deployment_received,15.884779214859009
-check_connectivity_federated_service_start,15.889415502548218
-check_connectivity_federated_service_finished,15.892451524734497

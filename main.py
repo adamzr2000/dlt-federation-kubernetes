@@ -4,6 +4,8 @@ import time
 import yaml
 import requests
 import csv
+import subprocess
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -622,7 +624,7 @@ def create_k8s_resource_endpoint(yaml_file: YAMLFile):
 
 @app.delete("/delete_k8s_resource", tags=["K8s Functions"], summary="Delete K8s resource from yaml file")
 def delete_k8s_resource_endpoint(yaml_file: YAMLFile):
-DELETE_RESOURCES_ENDPOINT    """
+    """
     Endpoint to delete a Kubernetes resource based on selected YAML file.
     """
     yaml_file_path = f"descriptors/{yaml_file.value}"
@@ -650,7 +652,7 @@ def delete_all_k8s_resources_endpoint():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/deploy_object_detection_service", tags=["K8s Functions"], summary="Deploy object detection service")
+@app.post("/deploy_object_detection_service", tags=["K8s Functions"], summary="Deploy object detection service")
 def deploy_object_detection_service_endpoint():
     """
     Endpoint to create object detection service
@@ -845,7 +847,7 @@ async def check_service_announcements_endpoint():
             return {"No new events found": "No new services announced in the last 20 blocks."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-DELETE_RESOURCES_ENDPOINT
+
 @app.post("/place_bid/{service_id}-{service_price}",
           summary="Place a bid",
           tags=["Provider Functions"],

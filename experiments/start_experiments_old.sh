@@ -7,8 +7,7 @@ BASE_URL_PROVIDER="http://10.5.50.71:8000"
 # Endpoints
 CONSUMER_ENDPOINT="${BASE_URL_CONSUMER}/start_experiments_consumer?export_to_csv=true"
 PROVIDER_ENDPOINT="${BASE_URL_PROVIDER}/start_experiments_provider?export_to_csv=true"
-# DELETE_RESOURCES_ENDPOINT="${BASE_URL_PROVIDER}/delete_all_k8s_resources"
-DELETE_RESOURCES_ENDPOINT="${BASE_URL_PROVIDER}/delete_object_detection_service"
+DELETE_RESOURCES_ENDPOINT="${BASE_URL_PROVIDER}/delete_all_k8s_resources"
 
 # Directory to store logs
 LOGS_DIR="logs"
@@ -38,7 +37,7 @@ function start_experiments {
 
     # Once the consumer experiment is done, delete all resources on the provider and save the log
     curl -X DELETE "$DELETE_RESOURCES_ENDPOINT" 
-    sleep 2
+    sleep 4
 }
 
 # Run the experiments N times
