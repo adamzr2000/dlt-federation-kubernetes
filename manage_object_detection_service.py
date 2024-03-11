@@ -1,3 +1,5 @@
+from kubernetes import client, config
+from kubernetes.client.rest import ApiException
 import subprocess
 import time
 import sys
@@ -43,6 +45,7 @@ def get_service_external_ip(service_name, namespace="default", timeout=300):
 def load_kube_config():
     try:
         config.load_kube_config(config_file=os.path.join(os.getcwd(), "k8s-cluster-config", "microk8s-1-config"))
+        #config.load_kube_config(config_file=os.path.join(os.getcwd(), "k8s-cluster-config", "microk8s-2-config"))
     except:
         print("Could not load kubeconfig")
         sys.exit(1)
