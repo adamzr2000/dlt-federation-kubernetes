@@ -1,0 +1,13 @@
+step,timestamp
+service_announced,4.76837158203125e-07
+announce_received,2.1500909328460693
+bid_offer_sent,2.150165319442749
+bid_offer_received,6.136165857315064
+winner_choosen,6.142071962356567
+winner_received,10.145440101623535
+deployment_start,10.15389895439148
+deployment_finished,10.875692129135132
+confirm_deployment_sent,10.875699281692505
+confirm_deployment_received,14.135314702987673
+check_connectivity_federated_service_start,14.141218662261965
+check_connectivity_federated_service_finished,14.141310930252075
