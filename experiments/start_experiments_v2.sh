@@ -24,12 +24,8 @@ if [[ $num_tests -lt 1 || $num_tests -gt 20 ]]; then
 fi
 
 # Execute deploy_object_detection_federation_component_endpoint once before starting the loop
-curl -X POST "${BASE_URL_CONSUMER}/deploy_object_detection_federation_component" \
--H "Content-Type: application/json" \
--d '{
-    "domain": "consumer",
-    "service_to_wait": "mediamtx-service"
-}'
+curl -X POST "${BASE_URL_CONSUMER}/deploy_object_detection_federation_component?domain=consumer&service_to_wait=mediamtx-service" 
+
 
 # Function to start experiments
 function start_experiments {
