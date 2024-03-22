@@ -144,7 +144,7 @@ if domain == "consumer":
     # service_id = 'service' + str(int(time.time()))
     service_endpoint_consumer = ip_address
     service_consumer_address = block_address
-    service_requirements = 'service='
+    service_requirements = 'service=object-detector'
     bids_event = None  # Placeholder for event listener setup
     domain_name = "AD1"
 
@@ -508,9 +508,12 @@ def delete_all_k8s_resources(namespace='default'):
         print(f"Unexpected error during deletion: {e}")
         raise
 
+
+
+
 # Function to deploy object detection service
-def deploy_object_detection_service():
-    dir_path = "../6g-latency-sensitive-service/chart"
+def deploy_entire_object_detection_service():
+    dir_path = "descriptors/6g-latency-sensitive-service/chart"
     try:
         # Helm install commands for app-services and app-core
         subprocess.run(["helm", "install", "app-services", "./app", "-f", "./app/values/service-values.yaml"], cwd=dir_path, check=True)
@@ -534,7 +537,7 @@ def deploy_object_detection_service():
 
 
 # Function to delete object detection service
-def delete_object_detection_service():
+def delete_entire_object_detection_service():
     try:
         # Uninstall Helm releases for app-core and app-services
         subprocess.run(["helm", "uninstall", "app-core"], check=True)
@@ -553,6 +556,46 @@ def delete_object_detection_service():
         "receiver-encoder-publisher-",
         "mediamtx-"
     ])
+
+# Function to deploy only object detector component
+def deploy_object_detection_federation_component(domain, service_to_wait):
+    dir_path = "descriptors/6g-latency-sensitive-service/chart"
+    try:
+        # Helm install commands for app-services and app-core
+        subprocess.run(["helm", "install", f"federation-app-services-{domain}", "./app", "-f", f"./app/values/federation-object-detector-{domain}/service-values.yaml"], cwd=dir_path, check=True)
+        print("Services were applied successfully.")
+
+        # Wait for the object_detection_service IP 
+        service_ip = wait_for_service_ready(service_to_wait)
+        if service_ip is None:
+            print(f"Failed to obtain {service_to_wait} IP.")
+            return None
+        print(f"Found {service_to_wait} IP: {service_ip}")
+        
+        subprocess.run(["helm", "install", f"federation-app-core-{domain}", "./app", "-f", f"./app/values/federation-object-detector-{domain}/config-map-values.yaml", "-f", f"./app/values/federation-object-detector-{domain}/deployment-values.yaml"], cwd=dir_path, check=True)
+        print("Configmaps and deployments were applied successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to apply services: {e}")
+        return None
+
+    print("\nConfiguration completed successfully.")
+    return service_ip
+
+
+# Function to delete object detection service
+def delete_object_detection_federation_component(domain, pod_prefixes):
+    try:
+        # Uninstall Helm releases for app-core and app-services
+        subprocess.run(["helm", "uninstall", f"federation-app-core-{domain}"], check=True)
+        print("Release \"federation-app-core\" uninstalled.")
+        subprocess.run(["helm", "uninstall", f"federation-app-services-{domain}"], check=True)
+        print("Release \"federation-app-services\" uninstalled.")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to uninstall services: {e}")
+        return
+
+    # Wait for all deployments to terminate
+    wait_for_pods_terminated(pod_prefixes)
 
 # Function to check and wait for the service to get an external IP
 def wait_for_service_ready(service_name, namespace="default", timeout=200):
@@ -583,6 +626,28 @@ def wait_for_pods_terminated(prefixes):
             remaining_pods = [pod.metadata.name for pod in active_pods]
             print(f"Waiting for specific pods to terminate: {remaining_pods}")
             time.sleep(2)
+
+# Function to wait for specific pods to start
+def wait_for_pods_started(prefixes):
+    while True:
+        try:
+            # Retrieve all pods from all namespaces
+            pods = api_instance_coreV1.list_pod_for_all_namespaces().items
+
+            # Filter pods based on prefixes
+            active_pods = [pod for pod in pods if any(pod.metadata.name.startswith(prefix) for prefix in prefixes)]
+
+            # Check if all specified pods are in running state
+            if all(pod.status.phase == 'Running' for pod in active_pods):
+                print("All specified pods have started.")
+                break
+            else:
+                # Get remaining pods that are not in running state
+                remaining_pods = [pod.metadata.name for pod in active_pods if pod.status.phase != 'Running']
+                print(f"Waiting for specific pods to start: {remaining_pods}")
+                time.sleep(2)
+        except Exception as e:
+
 
 def create_csv_file(role, header, data):
     # Determine the base directory based on the role
@@ -658,7 +723,7 @@ def deploy_object_detection_service_endpoint():
     Endpoint to create object detection service
     """
     try:
-        mediamtx_service_ip = deploy_object_detection_service()
+        mediamtx_service_ip = deploy_entire_object_detection_service()
         return {"message": f"Service deployed. Mediamtx service IP = {mediamtx_service_ip}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -669,7 +734,7 @@ def delete_object_detection_service_endpoint():
     Endpoint to delete object detection service
     """
     try:
-        delete_object_detection_service()
+        delete_entire_object_detection_service()
         return {"message": f"Service deleted."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -972,7 +1037,9 @@ def deploy_service_endpoint(service_id: str):
             return {"message": "You are not the winner"}   
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))    
-@app.post("/start_experiments_consumer", tags=["Test deployment: federation of a simple K8s service"])
+
+
+@app.post("/start_experiments_consumer", tags=["Test deployment: federation of the entire object detection K8s service"])
 def start_experiments_consumer(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
@@ -1097,7 +1164,7 @@ def start_experiments_consumer(export_to_csv: bool = False):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))    
 
-@app.post("/start_experiments_provider", tags=["Test deployment: federation of a simple K8s service"])
+@app.post("/start_experiments_provider", tags=["Test deployment: federation of the entire object detection K8s service"])
 def start_experiments_provider(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
@@ -1178,9 +1245,6 @@ def start_experiments_provider(export_to_csv: bool = False):
                     # print("I am the winner")
                     break
 
-            # Deployment of the K8s service
-            #create_k8s_resource_from_yaml(f"descriptors/{YAMLFile.federated_service}")
-
             # Wait for the service to be ready and get the external IP
             #external_ip = wait_for_service_ready("federated-service") 
             external_ip = deploy_object_detection_service()
@@ -1207,8 +1271,6 @@ def start_experiments_provider(export_to_csv: bool = False):
             else:
                 print("CSV export not requested.")
 
-            # Delete all K8s resources
-            # delete_all_k8s_resources()
 
             return {"message": f"Federation process completed in {total_duration:.2f} seconds"}
         else:
@@ -1217,3 +1279,267 @@ def start_experiments_provider(export_to_csv: bool = False):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))    
 # ------------------------------------------------------------------------------------------------------------------------------#
+
+def update_configmap_and_restart_deployment(service_ip):
+    try:
+        # Update the ConfigMap
+        subprocess.run([
+            "kubectl", "patch", "configmap", "sampler-sender-config-map",
+            "--type", "merge",
+            "-p", f'{{"data":{{"destination_ip":"{service_ip}"}}}}'
+        ], check=True)
+
+        # Restart the deployment
+        subprocess.run([
+            "kubectl", "rollout", "restart", "deployment", "sampler-sender"
+        ], check=True)
+
+        wait_for_pods_started(["sampler-sender-"])
+
+        print("ConfigMap updated and deployment restarted successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}")
+        return
+
+
+@app.post("/start_experiments_consumer_v2", tags=["Test deployment: federation of the object detector component"])
+def start_experiments_consumer(export_to_csv: bool = False):
+    try:
+        header = ['step', 'timestamp']
+        data = []
+        
+        if domain == 'consumer':
+            
+            # Start time of the process
+            process_start_time = time.time()
+            
+            global bids_event
+            
+            # Service Announcement Sent
+            t_service_announced = time.time() - process_start_time
+            data.append(['service_announced', t_service_announced])
+            bids_event = AnnounceService()
+            print("\nSERVICE_ID:", service_id) # service + timestamp
+
+            print("\n\033[1;32m(TX-1) Service announcement sent to the SC\033[0m")
+
+            # Consumer AD wait for provider bids
+            bidderArrived = False
+
+            print("Waiting for bids...\n")
+            while bidderArrived == False:
+                new_events = bids_event.get_all_entries()
+                for event in new_events:
+                    
+                    # Bid Offer Received
+                    t_bid_offer_received = time.time() - process_start_time
+                    data.append(['bid_offer_received', t_bid_offer_received])
+
+                    event_id = str(web3.toText(event['args']['_id']))
+                    
+                    # Choosing provider
+                    # t_choosing_provider = time.time() - process_start_time
+                    # data.append(['choosing_provider', t_choosing_provider])
+
+                    # service id, service id, index of the bid
+                    print(service_id, web3.toText(event['args']['_id']), event['args']['max_bid_index'])
+                    print("BIDS ENTERED")
+                    bid_index = int(event['args']['max_bid_index'])
+                    bidderArrived = True 
+                    if int(bid_index) < 2:
+
+                        print("\nBids-info = [provider address , service price , bid index]\n")
+                        bid_info = GetBidInfo(int(bid_index-1))
+                        print(bid_info)
+                        
+                        # Provider choosen
+                        # t_provider_choosen = time.time() - process_start_time
+                        # data.append(['provider_choosen', t_provider_choosen])
+
+                        # Winner choosen sent
+                        t_winner_choosen = time.time() - process_start_time
+                        data.append(['winner_choosen', t_winner_choosen])
+                        
+                        ChooseProvider(int(bid_index)-1)
+                        print("\n\033[1;32m(TX-3) Provider choosen! (bid index=" + str(bid_index-1) + ")\033[0m")
+
+                        # Service closed (state 1)
+                        #DisplayServiceState(service_id)
+                        break
+
+            # Consumer AD wait for provider confirmation
+            serviceDeployed = False 
+            while serviceDeployed == False:
+                serviceDeployed = True if GetServiceState(service_id) == 2 else False
+            
+            # Confirmation received
+            t_confirm_deployment_received = time.time() - process_start_time
+            data.append(['confirm_deployment_received', t_confirm_deployment_received])
+            
+            # Service deployed info
+            external_ip, service_endpoint_provider = GetDeployedInfo(service_id)
+            
+            t_check_connectivity_federated_service_start = time.time() - process_start_time
+            data.append(['check_connectivity_federated_service_start', t_check_connectivity_federated_service_start])
+
+            external_ip = external_ip.decode('utf-8')
+            service_endpoint_provider = service_endpoint_provider.decode('utf-8')
+
+            print("Service deployed info:")
+            print("External IP:", external_ip)
+            print("Service endpoint provider:", service_endpoint_provider)
+
+
+            # Establish connectivity with the federated service
+            retry_limit = 5  # Maximum number of connection attempts
+            retry_count = 0
+            connected = True
+            # connected = False
+            while not connected and retry_count < retry_limit:
+                connected, response_content = check_service_connectivity(external_ip)
+                if not connected:
+                    print("Failed to establish connection with the federated service. Retrying...")
+                    retry_count += 1
+                    time.sleep(2)  # Wait for 2 seconds before retrying
+            if not connected:
+                print(f"Unable to establish connection with the federated service after {retry_limit} attempts.")
+                return {"error": f"Failed to establish connection with the federated service after {retry_limit} attempts."}
+
+            t_check_connectivity_federated_service_finished = time.time() - process_start_time
+            data.append(['check_connectivity_federated_service_finished', t_check_connectivity_federated_service_finished])
+
+            total_duration = time.time() - process_start_time
+
+            update_configmap_and_restart_deployment(external_ip)
+            print("Successfully connected to the federated service")
+            # print(response_content)
+
+            if export_to_csv:
+                # Export the data to a csv file only if export_to_csv is True
+                create_csv_file(domain, header, data)
+                print(f"Data exported to CSV for {domain}.")
+                # delete_object_detection_federation_component("consumer", ["frontend-", "sampler-sender-", "receiver-encoder-publisher-", "mediamtx-"])
+            else:
+                print("CSV export not requested.")
+
+            return {"message": f"Federation process completed in {total_duration:.2f} seconds"}
+        else:
+            error_message = "You must be consumer to run this code"
+            raise HTTPException(status_code=500, detail=error_message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))    
+
+@app.post("/start_experiments_provider_v2", tags=["Test deployment: federation of the object detector component"])
+def start_experiments_provider(export_to_csv: bool = False):
+    try:
+        header = ['step', 'timestamp']
+        data = []
+        
+        if domain == 'provider':
+            
+            # Start time of the process
+            process_start_time = time.time()
+
+            global winnerChosen_event 
+            service_id = ''
+            print("\nSERVICE_ID:", service_id)
+
+            newService_event = ServiceAnnouncementEvent()
+            newService = False
+            open_services = []
+
+            # Provider AD wait for service announcements
+            while newService == False:
+                new_events = newService_event.get_all_entries()
+                for event in new_events:
+                    service_id = web3.toText(event['args']['id'])
+                    
+                    requirements = web3.toText(event['args']['requirements'])
+
+                    requested_service = requirements.split("=")[1]
+                    # Removes null characters at the end of the string
+                    requested_service = requested_service.rstrip('\x00') 
+                    
+                    if GetServiceState(service_id) == 0:
+                        open_services.append(service_id)
+                print("OPEN =", len(open_services)) 
+                if len(open_services) > 0:
+                    
+                    # Announcement received
+                    t_announce_received = time.time() - process_start_time
+                    data.append(['announce_received', t_announce_received])
+
+                    print('Announcement received:')
+                    print(new_events)
+                    print("\n\033[1;33mRequested service: " + repr(requested_service) + "\033[0m")
+                    newService = True
+                
+            service_id = open_services[-1]
+
+            # Place a bid offer to the Federation SC
+            t_bid_offer_sent = time.time() - process_start_time
+            data.append(['bid_offer_sent', t_bid_offer_sent])
+            winnerChosen_event = PlaceBid(service_id, 10)
+
+            print("\n\033[1;32m(TX-2) Bid offer sent to the SC\033[0m")
+            
+            # Ask to the Federation SC if there is a winner (wait...)
+        
+            winnerChosen = False
+            while winnerChosen == False:
+                new_events = winnerChosen_event.get_all_entries()
+                for event in new_events:
+                    event_serviceid = web3.toText(event['args']['_id'])
+                    if event_serviceid == service_id:
+                        
+                        # Winner choosen received
+                        t_winner_received = time.time() - process_start_time
+                        data.append(['winner_received', t_winner_received])
+                        print("There is a winner")
+                        winnerChosen = True
+                        break
+            
+            am_i_winner = False
+            while am_i_winner == False:
+                # Provider AD ask if he is the winner
+                am_i_winner = CheckWinner(service_id)
+                if am_i_winner == True:
+                    # Start deployment of the requested federated service
+                    t_deployment_start = time.time() - process_start_time
+                    data.append(['deployment_start', t_deployment_start])
+                    # print("I am the winner")
+                    break
+
+            # Wait for the service to be ready and get the external IP
+            external_ip = deploy_object_detection_federation_component("provider", "object-detector-service")
+
+            # Deployment finished
+            t_deployment_finished = time.time() - process_start_time
+            data.append(['deployment_finished', t_deployment_finished])
+                
+            # Deployment confirmation sent
+            t_confirm_deployment_sent = time.time() - process_start_time
+            data.append(['confirm_deployment_sent', t_confirm_deployment_sent])
+            ServiceDeployed(service_id, external_ip)
+
+            total_duration = time.time() - process_start_time
+                
+            print("\n\033[1;32m(TX-4) Service deployed\033[0m")
+            print("External IP:", external_ip)
+            DisplayServiceState(service_id)
+                
+            if export_to_csv:
+                # Export the data to a csv file only if export_to_csv is True
+                create_csv_file(domain, header, data)
+                print(f"Data exported to CSV for {domain}.")
+
+                # delete_object_detection_federation_component("provider", ["object-detector-"])
+            else:
+                print("CSV export not requested.")
+
+            return {"message": f"Federation process completed in {total_duration:.2f} seconds"}
+        else:
+            error_message = "You must be provider to run this code"
+            raise HTTPException(status_code=500, detail=error_message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))    

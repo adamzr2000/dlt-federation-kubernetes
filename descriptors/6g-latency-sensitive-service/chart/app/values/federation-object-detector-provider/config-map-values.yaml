@@ -1,0 +1,5 @@
+configMaps:
+  - name: object-detector-config-map
+    data:
+      port: "5559"
+      yolo_model: "yolov8n.pt"

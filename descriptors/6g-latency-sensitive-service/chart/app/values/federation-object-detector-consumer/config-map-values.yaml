@@ -18,14 +18,10 @@ configMaps:
       bit_rate_port: "5556"
       speed_preset_port: "5557"
       resolution_port: "5558"
-  # - name: object-detector-config-map
-  #   data:
-  #     port: "5559"
-  #     yolo_model: "yolov8n.pt"
   - name: sampler-sender-config-map
     data:
       port: "5554"
       framerate: "1/1"
-      destination_ip: "10.5.50.80"
+      destination_ip: "object-detector-service"
       destination_port: "5559"
       framerate_port: "5560"

@@ -1,0 +1,18 @@
+deployments:
+  - name: object-detector
+    app: object-detector
+    replicas: 1
+    containerName: object-detector
+    imageRegistry: registry.gitlab.com/netmode
+    imageName: 6g-latency-sensitive-service
+    imageTag: object_detector
+    imagePullPolicy: Always
+    ports:
+      - containerPort: 5559
+    env:
+      - name: port
+        configMapName: object-detector-config-map
+        key: port
+      - name: yolo_model
+        configMapName: object-detector-config-map
+        key: yolo_model
