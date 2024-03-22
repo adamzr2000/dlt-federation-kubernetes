@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException, Query
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from enum import Enum
+from typing import List
 
 
 class YAMLFile(str, Enum):
@@ -647,6 +648,8 @@ def wait_for_pods_started(prefixes):
                 print(f"Waiting for specific pods to start: {remaining_pods}")
                 time.sleep(2)
         except Exception as e:
+            print(f"Error occurred: {e}")
+            pass
 
 
 def create_csv_file(role, header, data):
@@ -735,6 +738,35 @@ def delete_object_detection_service_endpoint():
     """
     try:
         delete_entire_object_detection_service()
+        return {"message": f"Service deleted."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/deploy_object_detection_federation_component", tags=["K8s Functions"], summary="Deploy object detection service")
+def deploy_object_detection_federation_component_endpoint(domain: str, service_to_wait: str):
+    """
+    Endpoint to create object detection service
+    """
+    try:
+        service_ip = deploy_object_detection_federation_component(domain, service_to_wait)
+        return {"message": f"Service deployed. {service_to_wait} IP = {service_ip}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/delete_object_detection_federation_component", tags=["K8s Functions"], summary="Delete object detection service")
+def delete_object_detection_federation_component_endpoint(data: dict):
+    """
+    Endpoint to delete object detection service
+    """
+    try:
+        domain = data.get("domain")
+        pod_prefixes = data.get("pod_prefixes", [])
+
+        if not isinstance(pod_prefixes, list):
+            raise HTTPException(status_code=400, detail="pod_prefixes must be a list")
+
+        delete_object_detection_federation_component(domain, pod_prefixes)
         return {"message": f"Service deleted."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
