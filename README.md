@@ -12,7 +12,7 @@ Description of the repo.
 ![Experimental Setup](images/experimental-setup.png)
 
 The configuration of the simulation:
-- 2 VMs containing the Docker and MicroK8s
+- 2 VMs containing Docker and MicroK8s
 - Both interconnected in bridge mode within KVM
 - Both VMs have access to a blockchain node
 
@@ -24,7 +24,7 @@ Before getting started, make sure you have the following installed on your syste
 - [Docker](https://docs.docker.com/engine/install/ubuntu)
 - [Docker Compose](https://docs.docker.com/compose/install/linux)
 
-## Installation
+# Installation
 
 1. Clone the repository:
 ```
@@ -54,22 +54,23 @@ cd ../eth-netstats
 pip install -r requirements.txt
 ```
 
-## Usage 
+# DLT Network Setup
 
-1. Creating a DLT Network
+Firstly, we will create a DLT network using Docker containers and Geth (Go-Ethereum) software. The network will consist of two nodes, each connected to a bootnode to facilitate their association with one another.
 
-Initiate your private Ethereum Network on [VM1], which relies on containerized Geth nodes, by running:
+1. Initialize the Ethereum network:
+
+**(VM1)** Navigate to the `dlt-network-docker` directory and start the network setup:
 
 Note: Please make sure to modify the IP addresses in the `.env` file according to your setup before executing the script. For example, replace 10.5.50.70 with the IP address of your VM1 and 10.5.50.71 with the IP address of your VM2.
 
 ```bash
-cd dlt-network-docker
 ./start_dlt_network.sh
 ```
 
-2. Joining the DLT Network
+2. Join the Ethereum network
 
-On [VM2], to join the DLT network from a second node, execute:
+**(VM2)** To join the network from a second node, navigate to the `dlt-network-docker` directory and execute:
 
 ```bash
 ./join_dlt_network.sh node2
@@ -77,29 +78,39 @@ On [VM2], to join the DLT network from a second node, execute:
 
 ## Verifying Node Association
 
-After starting the DLT network, you can verify that the nodes have associated correctly by executing the following commands:
+After starting the Ethereum network, you can verify that the nodes have associated correctly by executing the following commands:
 ```bash
-docker exec -it node1 geth --exec "net.peerCount" attach ws://10.5.50.70:3334
+docker exec -it node1 geth --exec "net.peerCount" attach ws://<vm1-ip-address>:3334
 ```
 
 ```bash
-docker exec -it node2 geth --exec "net.peerCount" attach ws://10.5.50.71:3335
+docker exec -it node2 geth --exec "net.peerCount" attach ws://<vm2-ip-address>:3335
 ```
 
 Each command should report `1 peer`, indicating that the nodes have successfully connected to each other.
 
 
-Access the [eth-netsats](http://10.5.50.70:3000) web interface for additional information.
+Access the [eth-netsats](http://<vm1-ip-address>:3000) web interface for additional information.
 
-2. Deploy the Federation Smart Contract to the Blockchain Network:
+4. Stop the Network:
+
+**(VM1)** When needed, use the following command to stop the network:
+
+```bash
+./stop_dlt_network.sh
+```
+
+# Testing
+
+1. **(VM1 or VM2)** Deploy the Federation Smart Contract to the Blockchain Network:
 ```bash
 cd smart-contracts
 ./deploy.sh 
 ```
 
-3. Start the web server of the API 
+2. **(all)** Start the web server of the API 
 
-Note: Before starting the web server, ensure to export the Kubernetes cluster configuration file for each VM. Navigate to the `k8-scluster-config` directory and execute `./export_k8s_cluster_config`.
+Note: Before starting the web server, ensure to export the Kubernetes cluster configuration file for each VM. Navigate to the `k8s-cluster-config` directory and execute `./export_k8s_cluster_config`, indicating 
 
 ```bash
 ./start_app.sh
