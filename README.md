@@ -1,4 +1,20 @@
-# DLT Federation with K8s
+# DLT Service Federation using Kubernetes
+
+## Introduction
+
+Description of the repo.
+
+**Author:** Adam Zahir Rodriguez
+
+
+## Scenario setup
+
+![Experimental Setup](images/experimental-setup.png)
+
+The configuration of the simulation:
+- 2 VMs containing the prerequisitad mentioned before
+- Both interconnected in bridge mode within KVM
+- Both VMs have access to a blockchain node
 
 ## Prerequisites
 
@@ -14,6 +30,7 @@ Before getting started, make sure you have the following installed on your syste
 ```
 git clone git@github.com:adamzr2000/dlt-federation-kubernetes.git
 ```
+
 2. Build Docker Images:
 Follow these steps to build the necessary Docker images:
 
@@ -21,9 +38,10 @@ Follow these steps to build the necessary Docker images:
 ```bash
 cd docker-images
 ```
-2.2. For each of the following subdirectories (`dlt-node`, `truffle`, `eth-netstats`), execute the `build.sh` script. Example:
+
+2.2. For each of the following subdirectories (`dlt-node`, `truffle`, `eth-netstats`), execute the `build.sh` script. 
 ```bash
-cd ../dlt-node
+cd dlt-node
 ./build.sh
 cd ../truffle
 ./build.sh
@@ -40,9 +58,9 @@ pip install -r requirements.txt
 
 1. Creating a DLT Network
 
-Initiate your private Ethereum Network, which relies on containerized Geth nodes, by running:
+Initiate your private Ethereum Network on [VM1], which relies on containerized Geth nodes, by running:
 
-*Both VMs must have access to blockchain nodes of this network (10.5.50.X/16)*
+Note: Please make sure to modify the IP addresses in the `.env` file according to your setup before executing the script. For example, replace 10.5.50.70 with the IP address of your VM1 and 10.5.50.71 with the IP address of your VM2.
 
 ```bash
 cd dlt-network-docker
@@ -51,10 +69,10 @@ cd dlt-network-docker
 
 2. Joining the DLT Network
 
-To join the DLT network from a second node, execute:
+On [VM2], to join the DLT network from a second node, execute:
 
 ```bash
-./join_dlt_network.sh
+./join_dlt_network.sh node2
 ```
 
 ## Verifying Node Association
@@ -80,6 +98,9 @@ cd smart-contracts
 ```
 
 3. Start the web server of the API 
+
+Note: Before starting the web server, ensure to export the Kubernetes cluster configuration file for each VM. Navigate to the `k8-scluster-config` directory and execute `./export_k8s_cluster_config`.
+
 ```bash
 ./start_app.sh
 ```

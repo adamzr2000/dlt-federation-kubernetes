@@ -510,8 +510,6 @@ def delete_all_k8s_resources(namespace='default'):
         raise
 
 
-
-
 # Function to deploy object detection service
 def deploy_entire_object_detection_service():
     dir_path = "descriptors/6g-latency-sensitive-service/chart"
@@ -1072,7 +1070,7 @@ def deploy_service_endpoint(service_id: str):
 
 
 @app.post("/start_experiments_consumer", tags=["Test deployment: federation of the entire object detection K8s service"])
-def start_experiments_consumer(export_to_csv: bool = False):
+def start_experiments_consumer_entire_service(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
         data = []
@@ -1107,8 +1105,6 @@ def start_experiments_consumer(export_to_csv: bool = False):
                     event_id = str(web3.toText(event['args']['_id']))
                     
                     # Choosing provider
-                    # t_choosing_provider = time.time() - process_start_time
-                    # data.append(['choosing_provider', t_choosing_provider])
 
                     # service id, service id, index of the bid
                     print(service_id, web3.toText(event['args']['_id']), event['args']['max_bid_index'])
@@ -1120,12 +1116,9 @@ def start_experiments_consumer(export_to_csv: bool = False):
                         print("\nBids-info = [provider address , service price , bid index]\n")
                         bid_info = GetBidInfo(int(bid_index-1))
                         print(bid_info)
-                        
-                        # Provider choosen
-                        # t_provider_choosen = time.time() - process_start_time
-                        # data.append(['provider_choosen', t_provider_choosen])
+                    
 
-                        # Winner choosen sent
+                        # Winner choosen 
                         t_winner_choosen = time.time() - process_start_time
                         data.append(['winner_choosen', t_winner_choosen])
                         
@@ -1197,7 +1190,7 @@ def start_experiments_consumer(export_to_csv: bool = False):
         raise HTTPException(status_code=500, detail=str(e))    
 
 @app.post("/start_experiments_provider", tags=["Test deployment: federation of the entire object detection K8s service"])
-def start_experiments_provider(export_to_csv: bool = False):
+def start_experiments_provider_entire_service(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
         data = []
@@ -1334,8 +1327,24 @@ def update_configmap_and_restart_deployment(service_ip):
         return
 
 
+def scale_deployment(deployment_name, replicas):
+    try:
+        subprocess.run([
+            "kubectl", "scale", "deployment", deployment_name,
+            f"--replicas={replicas}"
+        ], check=True)
+        
+        print(f"Deployment '{deployment_name}' scaled to {replicas} replicas successfully.")
+
+        # Wait for pods to start after scaling
+        wait_for_pods_started([deployment_name + "-"])
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}")
+        return
+
+
 @app.post("/start_experiments_consumer_v2", tags=["Test deployment: federation of the object detector component"])
-def start_experiments_consumer(export_to_csv: bool = False):
+def start_experiments_consumer_object_detection_component(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
         data = []
@@ -1370,8 +1379,6 @@ def start_experiments_consumer(export_to_csv: bool = False):
                     event_id = str(web3.toText(event['args']['_id']))
                     
                     # Choosing provider
-                    # t_choosing_provider = time.time() - process_start_time
-                    # data.append(['choosing_provider', t_choosing_provider])
 
                     # service id, service id, index of the bid
                     print(service_id, web3.toText(event['args']['_id']), event['args']['max_bid_index'])
@@ -1384,10 +1391,6 @@ def start_experiments_consumer(export_to_csv: bool = False):
                         bid_info = GetBidInfo(int(bid_index-1))
                         print(bid_info)
                         
-                        # Provider choosen
-                        # t_provider_choosen = time.time() - process_start_time
-                        # data.append(['provider_choosen', t_provider_choosen])
-
                         # Winner choosen sent
                         t_winner_choosen = time.time() - process_start_time
                         data.append(['winner_choosen', t_winner_choosen])
@@ -1462,7 +1465,7 @@ def start_experiments_consumer(export_to_csv: bool = False):
         raise HTTPException(status_code=500, detail=str(e))    
 
 @app.post("/start_experiments_provider_v2", tags=["Test deployment: federation of the object detector component"])
-def start_experiments_provider(export_to_csv: bool = False):
+def start_experiments_provider_object_detection_component(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
         data = []
