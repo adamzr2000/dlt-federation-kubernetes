@@ -12,7 +12,7 @@ Description of the repo.
 ![Experimental Setup](images/experimental-setup.png)
 
 The configuration of the simulation:
-- 2 VMs containing the prerequisitad mentioned before
+- 2 VMs containing the Docker and MicroK8s
 - Both interconnected in bridge mode within KVM
 - Both VMs have access to a blockchain node
 
