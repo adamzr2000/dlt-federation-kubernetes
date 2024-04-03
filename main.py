@@ -680,7 +680,7 @@ def create_k8s_resource_endpoint(yaml_file: YAMLFile):
     Endpoint to create a Kubernetes resource based on selected YAML file.
     """
     # The value of yaml_file is now one of the Enum's values, e.g., "nginx-pod.yaml"
-    yaml_file_path = f"descriptors/{yaml_file.value}"
+    yaml_file_path = f"descriptors/examples/{yaml_file.value}"
 
     try:
         # Assuming create_resource_from_yaml is a function you've defined to handle the creation
@@ -694,7 +694,7 @@ def delete_k8s_resource_endpoint(yaml_file: YAMLFile):
     """
     Endpoint to delete a Kubernetes resource based on selected YAML file.
     """
-    yaml_file_path = f"descriptors/{yaml_file.value}"
+    yaml_file_path = f"descriptors/examples/{yaml_file.value}"
 
     # Ensure the file exists before attempting deletion
     if not os.path.isfile(yaml_file_path):
@@ -1070,7 +1070,7 @@ def deploy_service_endpoint(service_id: str):
         raise HTTPException(status_code=500, detail=str(e))    
 
 
-@app.post("/start_experiments_consumer_v1", tags=["Test deployment: federation of the entire object detection K8s service"])
+@app.post("/start_experiments_consumer_v1", tags=["Test 1: migration of the entire object detection K8s service"])
 def start_experiments_consumer_entire_service(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
@@ -1181,6 +1181,7 @@ def start_experiments_consumer_entire_service(export_to_csv: bool = False):
                 create_csv_file(domain, header, data)
                 print(f"Data exported to CSV for {domain}.")
             else:
+                delete_entire_object_detection_service()
                 print("CSV export not requested.")
 
             return {"message": f"Federation process completed in {total_duration:.2f} seconds"}
@@ -1190,7 +1191,7 @@ def start_experiments_consumer_entire_service(export_to_csv: bool = False):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))    
 
-@app.post("/start_experiments_provider_v1", tags=["Test deployment: federation of the entire object detection K8s service"])
+@app.post("/start_experiments_provider_v1", tags=["Test 1: migration of the entire object detection K8s service"])
 def start_experiments_provider_entire_service(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
@@ -1343,7 +1344,7 @@ def scale_deployment(deployment_name, replicas):
         return
 
 
-@app.post("/start_experiments_consumer_v2", tags=["Test deployment: federation of the object detector component"])
+@app.post("/start_experiments_consumer_v2", tags=["Test 2: migration of the object detector component"])
 def start_experiments_consumer_object_detection_component(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
@@ -1455,6 +1456,9 @@ def start_experiments_consumer_object_detection_component(export_to_csv: bool = 
                 print(f"Data exported to CSV for {domain}.")
                 # delete_object_detection_federation_component("consumer", ["frontend-", "sampler-sender-", "receiver-encoder-publisher-", "mediamtx-"])
             else:
+                subprocess.run("kubectl delete deployment object-detector", check=True)
+                subprocess.run("kubectl delete svc object-detector-service", check=True)
+                wait_for_pods_terminated(["object-detector-"])
                 print("CSV export not requested.")
 
             return {"message": f"Federation process completed in {total_duration:.2f} seconds"}
@@ -1464,7 +1468,7 @@ def start_experiments_consumer_object_detection_component(export_to_csv: bool = 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))    
 
-@app.post("/start_experiments_provider_v2", tags=["Test deployment: federation of the object detector component"])
+@app.post("/start_experiments_provider_v2", tags=["Test 2: migration of the object detector component"])
 def start_experiments_provider_object_detection_component(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']

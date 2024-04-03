@@ -56,6 +56,7 @@ Firstly, we will create a blockchain network using `dlt-node` container images. 
 **Note:** Please make sure to modify the IP addresses in the `.env` file according to your setup before executing the script. Replace `IP_NODE_1` with the IP address of your **VM1** and `IP_NODE_2` with the IP address of your **VM2**.
 
 ```bash
+cd dlt-network-docker
 ./start_dlt_network.sh
 ```
 
@@ -64,6 +65,7 @@ Firstly, we will create a blockchain network using `dlt-node` container images. 
 **(VM2)** Navigate to the `dlt-network-docker` directory and execute:
 
 ```bash
+cd dlt-network-docker
 ./join_dlt_network.sh node2
 ```
 
@@ -102,7 +104,7 @@ cd smart-contracts
 ./deploy.sh 
 ```
 
-2. Start the orchestrator's web server and specify the domain role for the federation (e.g., VM1 as consumer and VM2 as provider)
+2. Start the orchestrator's web server on each VM and specify the domain role for the federation (e.g., VM1 as consumer and VM2 as provider)
 
 ```bash
 ./start_app.sh
@@ -110,6 +112,60 @@ cd smart-contracts
 
 For detailed information about the federation functions, refer to the REST API documentation, which is based on Swagger UI, at: `http://<vm-ip-address>:8000/docs`
 
+3. Register each AD in the Smart Contract to enable their participation in the federation:
+
+```bash
+# VM1 
+curl -X POST http://<vm1-ip-address>:8000/register_domain
+
+# VM2 
+curl -X POST http://<vm2-ip-address>:8000/register_domain
+```
+
+## Scenario 1: migration of the entire object detection K8s service
+
+The consumer AD initiates the service deployment:
+```bash
+curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service
+```
+
+The provider AD listens for federation events and the consumer AD trigger federation process:
+```bash
+# VM1
+curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v1?export_to_csv=false
+
+# VM2 
+curl -X POST http://<vm2-ip-address>:8000/start_experiments_consumer_v1?export_to_csv=false
+```
+
+**Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
+
+Upon successful completion of the federation procedures, the entire service should be deployed in the provider AD, and the consumer AD can access it through the `external_ip` endpoint (shared via the smart contract)
+
+To delete the service, execute:
+```bash
+curl -X DELETE http://<vm1-ip-address>:8000/delete_object_detection_service
+```
+
+## Scenario 2: migration of the object detection component
+
+The consumer AD initiates the service deployment:
+```bash
+curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service
+```
+
+The provider AD listens for federation events and the consumer AD trigger federation process:
+```bash
+# VM1
+curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v2?export_to_csv=false
+
+# VM2 
+curl -X POST http://<vm2-ip-address>:8000/start_experiments_consumer_v2?export_to_csv=false
+```
+
+**Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
+
+Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD. The consumer AD then terminates its object detection component and updates the configmap of the `sampler-sender` to direct the video stream to the `external_ip` endpoint of the object detection component (shared via the smart contract).
 
 
 ## Kubernetes configuration utilities

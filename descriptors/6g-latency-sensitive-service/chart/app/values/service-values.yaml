@@ -25,6 +25,7 @@ services:
         targetPort: 8189
   - name: object-detector-service
     app: object-detector
+    type: LoadBalancer
     ports:
       - name: get-frames-from-sampler-sender
         protocol: UDP
