@@ -6,6 +6,7 @@ import requests
 import csv
 import subprocess
 import sys
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -146,7 +147,7 @@ if domain == "consumer":
     # service_id = 'service' + str(int(time.time()))
     service_endpoint_consumer = ip_address
     service_consumer_address = block_address
-    service_requirements = 'service=object-detector'
+    service_requirements = 'service=object-detector;replicas=1'
     bids_event = None  # Placeholder for event listener setup
     domain_name = "AD1"
 
@@ -402,6 +403,25 @@ def DisplayServiceState(service_id):
         print("\nService state", "Deployed")
     else:
         print(f"Error: state for service {service_id} is {current_service_state}")
+
+def extract_service_erquirements(requirements):
+    """
+    Extracts service and replicas from the requirements string.
+
+    Args:
+    - requirements (str): String containing service and replicas in the format "service=X;replicas=Y".
+
+    Returns:
+    - tuple: A tuple containing extracted service and replicas.
+    """
+    match = re.match(r'service=(.*?);replicas=(.*)', requirements)
+
+    if match:
+        requested_service = match.group(1)
+        replicas = match.group(2)
+        return requested_service, replicas
+    else:
+        return None, None
 
 def create_k8s_resource_from_yaml(yaml_file_path):
     """
@@ -1218,9 +1238,11 @@ def start_experiments_provider_entire_service(export_to_csv: bool = False):
                     
                     requirements = web3.toText(event['args']['requirements'])
 
-                    requested_service = requirements.split("=")[1]
-                    # Removes null characters at the end of the string
-                    requested_service = requested_service.rstrip('\x00') 
+                    # requested_service = requirements.split("=")[1]
+                    # # Removes null characters at the end of the string
+                    # requested_service = requested_service.rstrip('\x00') 
+
+                    requested_service, requested_replicas = extract_service_erquirements(requirements.rstrip('\x00'))
                     
                     if GetServiceState(service_id) == 0:
                         open_services.append(service_id)
@@ -1234,6 +1256,7 @@ def start_experiments_provider_entire_service(export_to_csv: bool = False):
                     print('Announcement received:')
                     print(new_events)
                     print("\n\033[1;33mRequested service: " + repr(requested_service) + "\033[0m")
+                    print("\033[1;33mRequested replicas: " + repr(requested_replicas) + "\033[0m")
                     newService = True
                 
             service_id = open_services[-1]
@@ -1456,8 +1479,8 @@ def start_experiments_consumer_object_detection_component(export_to_csv: bool = 
                 print(f"Data exported to CSV for {domain}.")
                 # delete_object_detection_federation_component("consumer", ["frontend-", "sampler-sender-", "receiver-encoder-publisher-", "mediamtx-"])
             else:
-                subprocess.run("kubectl delete deployment object-detector", check=True)
-                subprocess.run("kubectl delete svc object-detector-service", check=True)
+                api_instance_appsV1.delete_namespaced_deployment(name="object-detector", namespace="default")
+                api_instance_coreV1.delete_namespaced_service(name="object-detector-service", namespace="default")
                 wait_for_pods_terminated(["object-detector-"])
                 print("CSV export not requested.")
 
@@ -1495,10 +1518,8 @@ def start_experiments_provider_object_detection_component(export_to_csv: bool = 
                     
                     requirements = web3.toText(event['args']['requirements'])
 
-                    requested_service = requirements.split("=")[1]
-                    # Removes null characters at the end of the string
-                    requested_service = requested_service.rstrip('\x00') 
-                    
+                    requested_service, requested_replicas = extract_service_erquirements(requirements.rstrip('\x00'))
+
                     if GetServiceState(service_id) == 0:
                         open_services.append(service_id)
                 print("OPEN =", len(open_services)) 
@@ -1511,6 +1532,7 @@ def start_experiments_provider_object_detection_component(export_to_csv: bool = 
                     print('Announcement received:')
                     print(new_events)
                     print("\n\033[1;33mRequested service: " + repr(requested_service) + "\033[0m")
+                    print("\033[1;33mRequested replicas: " + repr(requested_replicas) + "\033[0m")
                     newService = True
                 
             service_id = open_services[-1]

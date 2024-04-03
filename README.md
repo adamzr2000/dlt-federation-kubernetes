@@ -144,7 +144,11 @@ Upon successful completion of the federation procedures, the entire service shou
 
 To delete the service, execute:
 ```bash
+# VM1
 curl -X DELETE http://<vm1-ip-address>:8000/delete_object_detection_service
+
+# VM2
+curl -X DELETE http://<vm2-ip-address>:8000/delete_object_detection_service
 ```
 
 ## Scenario 2: migration of the object detection component
@@ -167,6 +171,16 @@ curl -X POST http://<vm2-ip-address>:8000/start_experiments_consumer_v2?export_t
 
 Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD. The consumer AD then terminates its object detection component and updates the configmap of the `sampler-sender` to direct the video stream to the `external_ip` endpoint of the object detection component (shared via the smart contract).
 
+Verify executing `kubectl get configmap sampler-sender-config-map -o yaml` in the consumer AD. The `destination_ip` value should match the `external_ip` of the object detection component deployed in the provider AD.
+
+To delete the service, execute:
+```bash
+# VM1
+curl -X DELETE http://<vm1-ip-address>:8000/delete_object_detection_service
+
+# VM2
+curl -X DELETE "http://<vm2-ip-address>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
+```
 
 ## Kubernetes configuration utilities
 
