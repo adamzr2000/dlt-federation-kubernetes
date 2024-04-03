@@ -38,7 +38,7 @@ cd dlt-node && ./build.sh && cd ../truffle && ./build.sh && cd ../eth-netstats &
 
 - `eth-netstats`: Dashboard for monitoring Geth nodes within the blockchain network
 
-**Note:** For building images corresponding to the object detection service, please consult the README file located in the `descriptors/6g-latency-sensitive-service` directory
+**Note:** For building images corresponding to the object detection service, please consult the [README](https://gitlab.com/netmode/6g-latency-sensitive-service) file located in the `descriptors/6g-latency-sensitive-service` directory
 
 3. Install the necessary python dependencies:
 ```bash
@@ -80,7 +80,7 @@ docker exec -it node2 geth --exec "net.peerCount" attach ws://<vm2-ip-address>:3
 
 Each command should report `1 peer`, indicating that the nodes have successfully connected to each other.
 
-Access the [eth-netsats](http://<vm1-ip-address>:3000) web interface for additional information.
+Access the **eth-netsats** web interface for additional information at `http://<vm1-ip-address>:3000`
 
 4. Stop the network:
 
@@ -108,7 +108,7 @@ cd smart-contracts
 ./start_app.sh
 ```
 
-For detailed information about the federation functions, refer to the REST API documentation, which is based on Swagger UI, at: [http://<vm-ip-address>:8000/docs](http://<vm-ip-address>:8000/docs)
+For detailed information about the federation functions, refer to the REST API documentation, which is based on Swagger UI, at: `http://<vm-ip-address>:8000/docs`
 
 
 
