@@ -1,23 +1,21 @@
 # DLT Service Federation using Kubernetes
 
-## Introduction
+## Overview
 
 The DLT-federation is a component that enables fast, secure and dynamic service federation across 
 different administrative domains (ADs) by using distributed ledger technologies (DLTs). More specifically, the federation procedures are stored and deployed on a Federation Smart Contract which is running on top of a permissioned blockchain. Each domain sets up a blockchain node to gain access to the blockchain network. 
 
 **Author:** Adam Zahir Rodriguez
 
-## Scenario setup
+Here is a diagram that represents visually the experimental setup:
 
 ![Experimental Setup](images/experimental-setup.svg)
-
-The configuration of the simulation:
 
 - 2 VMs, each represented as an AD, containing [Docker](https://docs.docker.com/engine/install/ubuntu) and [Microk8s](https://microk8s.io/#install-microk8s)
 - Both interconnected in bridge mode within [KVM](https://help.ubuntu.com/community/KVM/Networking)
 - Both VMs have access to a blockchain node
 
-# Installation
+## Installation
 
 1. Clone the repository:
 ```bash
@@ -45,7 +43,39 @@ cd dlt-node && ./build.sh && cd ../truffle && ./build.sh && cd ../eth-netstats &
 pip3 install -r requirements.txt
 ```
 
-# Blockchain Network Setup
+## Microk8s Setup
+### Cluster Installation
+To effortlessly set up a fully-functional, single-node Kubernetes cluster, execute the following command:
+
+```bash
+sudo snap install microk8s --classic
+```
+
+### Helm Integration
+To integrate Helm, the Kubernetes package manager, with your Microk8s cluster, run:
+```bash
+microk8s enable helm helm3
+```
+
+### MetalLB Integration
+**MetalLB** is an open-source, software-based load balancer solution for Kubernetes clusters. It provides a network load balancing functionality by enabling the assignment of external IP addresses to services running within the cluster.
+
+Integrate MetalLB with your Microk8s cluster by executing the following command and specifying the appropriate address pool:
+```bash
+microk8s enable metallb
+
+<Enter IP address range>
+(e.g. 10.5.50.80-10.5.50.90)
+```
+
+Check if the MetalLB driver is running using the following commands:
+```bash
+kubectl get pods -n metallb-system
+kubectl get configmap -n metallb-system
+```
+
+
+## Blockchain Network Setup
 
 Firstly, we will create a blockchain network using `dlt-node` container images. The network will consist of two nodes, corresponding to VM1 and VM2, respectively. **VM1** will act as the bootnode, facilitating the association of both nodes with each other.
 
@@ -131,11 +161,11 @@ curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service
 
 The provider AD listens for federation events and the consumer AD trigger federation process:
 ```bash
-# VM1
-curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v1?export_to_csv=false
+# VM2
+curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v1
 
-# VM2 
-curl -X POST http://<vm2-ip-address>:8000/start_experiments_consumer_v1?export_to_csv=false
+# VM1
+curl -X POST http://<vm1-ip-address>:8000/start_experiments_consumer_v1
 ```
 
 **Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
@@ -160,18 +190,18 @@ curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service
 
 The provider AD listens for federation events and the consumer AD trigger federation process:
 ```bash
-# VM1
-curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v2?export_to_csv=false
+# VM2
+curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v2
 
-# VM2 
-curl -X POST http://<vm2-ip-address>:8000/start_experiments_consumer_v2?export_to_csv=false
+# VM1
+curl -X POST http://<vm1-ip-address>:8000/start_experiments_consumer_v2
 ```
 
 **Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
 
 Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD. The consumer AD then terminates its object detection component and updates the configmap of the `sampler-sender` to direct the video stream to the `external_ip` endpoint of the object detection component (shared via the smart contract).
 
-Verify executing `kubectl get configmap sampler-sender-config-map -o yaml` in the consumer AD. The `destination_ip` value should match the `external_ip` of the object detection component deployed in the provider AD.
+To verify, execute `kubectl get configmap sampler-sender-config-map -o yaml` in the consumer AD. The `destination_ip` value should match the `external_ip` of the object detection component deployed in the provider AD.
 
 To delete the service, execute:
 ```bash
@@ -180,24 +210,4 @@ curl -X DELETE http://<vm1-ip-address>:8000/delete_object_detection_service
 
 # VM2
 curl -X DELETE "http://<vm2-ip-address>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
-```
-
-## Kubernetes configuration utilities
-
-**Activate Metallb in the K8s cluster:**
-
-*MetalLB is an open-source, software-based load balancer solution for Kubernetes clusters. It provides a network load balancing functionality by enabling the assignment of external IP addresses to services running within the cluster* 
-
-1. Configure MetalLB: After installing Microk8s, you need to configure metallb with the appropriate address pool.
-```bash
-microk8s enable metallb
-
-<Enter IP address range>
-(e.g. 10.5.50.80-10.5.50.90)
-```
-
-2. Verify the installation: Use the following commands to check if the MetalLB driver is running:
-```
-kubectl get pods -n metallb-system
-kubectl get configmap -n metallb-system
 ```

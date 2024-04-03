@@ -20,7 +20,7 @@ contract Federation {
         bytes32 id;
         address provider;
         bytes32 endpoint_provider;
-        bytes32 req_info;
+        bytes req_info;
         ServiceState state;
     }
 
@@ -39,7 +39,7 @@ contract Federation {
     
     // Define events
     event OperatorRegistered(address operator, bytes32 name);
-    event ServiceAnnouncement(bytes32 requirements, bytes32 id);
+    event ServiceAnnouncement(bytes requirements, bytes32 id);
     event NewBid(bytes32 _id, uint256 max_bid_index);
     event ServiceAnnouncementClosed(bytes32 _id);
     event ServiceDeployedEvent(bytes32 _id);
@@ -59,7 +59,7 @@ contract Federation {
         return current_operator.name;
 	}
 
-    function AnnounceService(bytes32 _requirements, bytes32 _endpoint_consumer, bytes32 _id) public returns(ServiceState) {
+    function AnnounceService(bytes memory _requirements, bytes32 _endpoint_consumer, bytes32 _id) public returns(ServiceState) {
         Operator storage current_operator = operator[msg.sender];
         Service storage current_service = service[_id];
         require(current_operator.registered == true, "Operator is not registered. Can not bid. Please register.");
@@ -74,7 +74,7 @@ contract Federation {
         return service[_id].state;
     }
 
-    function GetServiceInfo(bytes32 _id, bool provider, address call_address) public view returns (bytes32, bytes32, bytes32) {
+    function GetServiceInfo(bytes32 _id, bool provider, address call_address) public view returns (bytes32, bytes32, bytes memory) {
         Operator storage current_operator = operator[call_address];
         Service storage current_service = service[_id];
         require(current_operator.registered == true, "Operator is not registered. Can not look into. Please register.");
@@ -143,7 +143,7 @@ contract Federation {
         }
     }
 
-    function ServiceDeployed(bytes32 info, bytes32 _id) public returns (bool) {
+    function ServiceDeployed(bytes memory info, bytes32 _id) public returns (bool) {
         Service storage current_service = service[_id];
         require(current_service.id == _id, "Service not exists");
         require(current_service.provider == msg.sender, "Only service provider can deploy the service");

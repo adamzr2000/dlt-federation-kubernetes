@@ -147,7 +147,7 @@ if domain == "consumer":
     # service_id = 'service' + str(int(time.time()))
     service_endpoint_consumer = ip_address
     service_consumer_address = block_address
-    service_requirements = 'service=object-detector;replicas=1'
+    service_requirements = 'service=object-detector;'
     bids_event = None  # Placeholder for event listener setup
     domain_name = "AD1"
 
