@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Script for experiments of migrating the entire object detection service
+
 # Base URL for consumer and provider
 BASE_URL_CONSUMER="http://10.5.50.70:8000"
 BASE_URL_PROVIDER="http://10.5.50.71:8000"
@@ -7,7 +9,6 @@ BASE_URL_PROVIDER="http://10.5.50.71:8000"
 # Endpoints
 CONSUMER_ENDPOINT="${BASE_URL_CONSUMER}/start_experiments_consumer?export_to_csv=true"
 PROVIDER_ENDPOINT="${BASE_URL_PROVIDER}/start_experiments_provider?export_to_csv=true"
-# DELETE_RESOURCES_ENDPOINT="${BASE_URL_PROVIDER}/delete_all_k8s_resources"
 DELETE_RESOURCES_ENDPOINT="${BASE_URL_PROVIDER}/delete_object_detection_service"
 
 # Directory to store logs

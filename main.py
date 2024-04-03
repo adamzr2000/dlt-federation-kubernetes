@@ -28,20 +28,20 @@ class YAMLFile(str, Enum):
 tags_metadata = [
     {
         "name": "Default DLT Functions",
-        "description": "General DLT operations that are applicable to both consumers and providers.",
+        "description": "General DLT functions for both consumer and provider domains.",
     },
     {
         "name": "Consumer Functions",
-        "description": "Operations specifically designed for consumers in the DLT network.",
+        "description": "Functions specifically designed for consumers in the DLT network.",
     },
     {
         "name": "Provider Functions",
-        "description": "Operations specifically designed for providers in the DLT network.",
+        "description": "Functions specifically designed for providers in the DLT network.",
     },
 ]
 
 app = FastAPI(
-    title="DLT Federation with K8s API Documentation",
+    title="DLT Service Federation using Kubernetes API Documentation",
     openapi_tags=tags_metadata,
     description="""
 - This API provides endpoints for interacting with the DLT network and Kubernetes orchestrator.
@@ -115,7 +115,8 @@ private_key = os.getenv(f'PRIVATE_KEY_NODE_{"1" if domain == "consumer" else "2"
 block_address = os.getenv(f'ETHERBASE_NODE_{"1" if domain == "consumer" else "2"}')
 
 # General setup
-ip_address = os.popen('ip a | grep 10.5.50').read().split('inet ', 1)[1].split('/', 1)[0]
+# ip_address = os.popen('ip a | grep 10.5.50').read().split('inet ', 1)[1].split('/', 1)[0]
+ip_address = os.getenv(f'IP_NODE_{"1" if domain == "consumer" else "2"}')
 
 # Number that is used to prevent transaction replay attacks and ensure the order of transactions.
 nonce = web3.eth.getTransactionCount(block_address)
@@ -1055,7 +1056,7 @@ async def check_if_I_am_Winner_endpoint(service_id: str):
 def deploy_service_endpoint(service_id: str):
     try:
         if CheckWinner(service_id):
-            create_k8s_resource_from_yaml(f"descriptors/{YAMLFile.federated_service}")
+            create_k8s_resource_from_yaml(f"descriptors/examples/{YAMLFile.federated_service}")
 
             # Wait for the service to be ready and get the external IP
             external_ip = wait_for_service_ready("federated-service") 
@@ -1069,7 +1070,7 @@ def deploy_service_endpoint(service_id: str):
         raise HTTPException(status_code=500, detail=str(e))    
 
 
-@app.post("/start_experiments_consumer", tags=["Test deployment: federation of the entire object detection K8s service"])
+@app.post("/start_experiments_consumer_v1", tags=["Test deployment: federation of the entire object detection K8s service"])
 def start_experiments_consumer_entire_service(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
@@ -1189,7 +1190,7 @@ def start_experiments_consumer_entire_service(export_to_csv: bool = False):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))    
 
-@app.post("/start_experiments_provider", tags=["Test deployment: federation of the entire object detection K8s service"])
+@app.post("/start_experiments_provider_v1", tags=["Test deployment: federation of the entire object detection K8s service"])
 def start_experiments_provider_entire_service(export_to_csv: bool = False):
     try:
         header = ['step', 'timestamp']
@@ -1271,8 +1272,7 @@ def start_experiments_provider_entire_service(export_to_csv: bool = False):
                     break
 
             # Wait for the service to be ready and get the external IP
-            #external_ip = wait_for_service_ready("federated-service") 
-            external_ip = deploy_object_detection_service()
+            external_ip = deploy_entire_object_detection_service()
 
             # Deployment finished
             t_deployment_finished = time.time() - process_start_time

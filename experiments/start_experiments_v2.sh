@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Script for experiments of migrating only the object detection component
+
 # Base URL for consumer and provider
 BASE_URL_CONSUMER="http://10.5.50.70:8000"
 BASE_URL_PROVIDER="http://10.5.50.71:8000"

@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   name: federated-pod
   labels:
-    app: nginx  # Label to target this Pod with a Service
+    app: nginx  
 spec:
   containers:
   - name: nginx-pod
@@ -18,7 +18,7 @@ metadata:
 spec:
   type: LoadBalancer
   selector:
-    app: nginx # Label to target Pods with a Service
+    app: nginx 
   ports:
     - protocol: TCP
       port: 80

@@ -2,7 +2,8 @@
 
 ## Introduction
 
-Description of the repo.
+The DLT-federation is a component that enables fast, secure and dynamic service federation across 
+different administrative domains (ADs) by using distributed ledger technologies (DLTs). More specifically, the federation procedures are stored and deployed on a Federation Smart Contract which is running on top of a permissioned blockchain. Each domain sets up a blockchain node to gain access to the blockchain network. 
 
 **Author:** Adam Zahir Rodriguez
 
@@ -11,7 +12,8 @@ Description of the repo.
 ![Experimental Setup](images/experimental-setup.svg)
 
 The configuration of the simulation:
-- 2 VMs containing [Docker](https://docs.docker.com/engine/install/ubuntu) and [Microk8s](https://microk8s.io/#install-microk8s)
+
+- 2 VMs, each represented as an AD, containing [Docker](https://docs.docker.com/engine/install/ubuntu) and [Microk8s](https://microk8s.io/#install-microk8s)
 - Both interconnected in bridge mode within [KVM](https://help.ubuntu.com/community/KVM/Networking)
 - Both VMs have access to a blockchain node
 
@@ -30,9 +32,13 @@ cd docker-images
 cd dlt-node && ./build.sh && cd ../truffle && ./build.sh && cd ../eth-netstats && ./build.sh
 ```
 
-- `dlt-node`: Based on [Go-Ethereum ](https://geth.ethereum.org/docs) software, serving as nodes within the blockchain network. 
+- `dlt-node`: Based on [Go-Ethereum (Geth)](https://geth.ethereum.org/docs) software, serving as nodes within the peer-to-peer blockchain network
+
 - `truffle`: Development framework for Ethereum-based blockchain applications. It provides a suite of tools that allows developers to write, test, and deploy smart contracts on the blockchain network
+
 - `eth-netstats`: Dashboard for monitoring Geth nodes within the blockchain network
+
+**Note:** For building images corresponding to the object detection service, please consult the README file located in the `descriptors/6g-latency-sensitive-service` directory
 
 3. Install the necessary python dependencies:
 ```bash
@@ -41,13 +47,13 @@ pip3 install -r requirements.txt
 
 # Blockchain Network Setup
 
-Firstly, we will create a Blockchain network using the `dlt-node` container image. The network will consist of two nodes, corresponding to VM1 and VM2, respectively. **VM1** will act as the bootnode, facilitating the association of both nodes with each other.
+Firstly, we will create a blockchain network using `dlt-node` container images. The network will consist of two nodes, corresponding to VM1 and VM2, respectively. **VM1** will act as the bootnode, facilitating the association of both nodes with each other.
 
 1. Initialize the network:
 
 **(VM1)** Navigate to the `dlt-network-docker` directory and start the network setup:
 
-Note: Please make sure to modify the IP addresses in the `.env` file according to your setup before executing the script. For example, replace `10.5.50.70` with the IP address of your **VM1** and `10.5.50.71` with the IP address of your **VM2**.
+**Note:** Please make sure to modify the IP addresses in the `.env` file according to your setup before executing the script. Replace `IP_NODE_1` with the IP address of your **VM1** and `IP_NODE_2` with the IP address of your **VM2**.
 
 ```bash
 ./start_dlt_network.sh
@@ -86,9 +92,11 @@ Access the [eth-netsats](http://<vm1-ip-address>:3000) web interface for additio
 
 # Usage
 
-Note: Before starting, ensure to export the Kubernetes cluster configuration file for each VM. Navigate to the `k8s-cluster-config` directory and execute `./export_k8s_cluster_config`.
+**Note:** Before starting, ensure to export the Kubernetes cluster configuration file for each VM. Navigate to the `k8s-cluster-config` directory and execute `./export_k8s_cluster_config`
 
-1. **(VM1 or VM2)** Deploy the Federation Smart Contract to the blockchain Network:
+1. Deploy the Federation Smart Contract to the blockchain Network:
+
+**(VM1 or VM2)** Execute the following commands:
 ```bash
 cd smart-contracts
 ./deploy.sh 
@@ -100,9 +108,8 @@ cd smart-contracts
 ./start_app.sh
 ```
 
-Consumer API documentation at: [http://10.5.50.70:8000/docs](http://10.5.50.70:8000/docs)
+For detailed information about the federation functions, refer to the REST API documentation, which is based on Swagger UI, at: [http://<vm-ip-address>:8000/docs](http://<vm-ip-address>:8000/docs)
 
-Provider API documentation at: [http://10.5.50.71:8000/docs](http://10.5.50.71:8000/docs)
 
 
 ## Kubernetes configuration utilities
