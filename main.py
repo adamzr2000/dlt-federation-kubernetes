@@ -147,7 +147,7 @@ if domain == "consumer":
     # service_id = 'service' + str(int(time.time()))
     service_endpoint_consumer = ip_address
     service_consumer_address = block_address
-    service_requirements = 'service=object-detector;'
+    service_requirements = 'service=object-detector;replicas=1'
     bids_event = None  # Placeholder for event listener setup
     domain_name = "AD1"
 
@@ -404,7 +404,7 @@ def DisplayServiceState(service_id):
     else:
         print(f"Error: state for service {service_id} is {current_service_state}")
 
-def extract_service_erquirements(requirements):
+def extract_service_requirements(requirements):
     """
     Extracts service and replicas from the requirements string.
 
@@ -578,7 +578,7 @@ def delete_entire_object_detection_service():
     ])
 
 # Function to deploy only object detector component
-def deploy_object_detection_federation_component(domain, service_to_wait):
+def deploy_object_detection_federation_component(domain, service_to_wait, replicas=1):
     dir_path = "descriptors/6g-latency-sensitive-service/chart"
     try:
         # Helm install commands for app-services and app-core
@@ -591,8 +591,14 @@ def deploy_object_detection_federation_component(domain, service_to_wait):
             print(f"Failed to obtain {service_to_wait} IP.")
             return None
         print(f"Found {service_to_wait} IP: {service_ip}")
-        
-        subprocess.run(["helm", "install", f"federation-app-core-{domain}", "./app", "-f", f"./app/values/federation-object-detector-{domain}/config-map-values.yaml", "-f", f"./app/values/federation-object-detector-{domain}/deployment-values.yaml"], cwd=dir_path, check=True)
+
+        helm_command_core = ["helm", "install", f"federation-app-core-{domain}", "./app", "-f", f"./app/values/federation-object-detector-{domain}/config-map-values.yaml", "-f", f"./app/values/federation-object-detector-{domain}/deployment-values.yaml"]
+
+        # If replicas parameter is different than 1, add the replicas flag to Helm command
+        if replicas != 1:
+            helm_command_core.extend(["--set", f"deployments[4].replicas={replicas}"])
+
+        subprocess.run(helm_command_core, cwd=dir_path, check=True)
         print("Configmaps and deployments were applied successfully.")
     except subprocess.CalledProcessError as e:
         print(f"Failed to apply services: {e}")
@@ -1102,10 +1108,13 @@ def start_experiments_consumer_entire_service(export_to_csv: bool = False):
             process_start_time = time.time()
             
             global bids_event
+            global service_requirements
             
             # Service Announcement Sent
             t_service_announced = time.time() - process_start_time
             data.append(['service_announced', t_service_announced])
+            service_requirements = service_requirements.replace(re.search(r'replicas=\d+', service_requirements).group(), f"replicas=3")
+
             bids_event = AnnounceService()
             print("\nSERVICE_ID:", service_id) # service + timestamp
 
@@ -1238,11 +1247,7 @@ def start_experiments_provider_entire_service(export_to_csv: bool = False):
                     
                     requirements = web3.toText(event['args']['requirements'])
 
-                    # requested_service = requirements.split("=")[1]
-                    # # Removes null characters at the end of the string
-                    # requested_service = requested_service.rstrip('\x00') 
-
-                    requested_service, requested_replicas = extract_service_erquirements(requirements.rstrip('\x00'))
+                    requested_service, requested_replicas = extract_service_requirements(requirements.rstrip('\x00'))
                     
                     if GetServiceState(service_id) == 0:
                         open_services.append(service_id)
@@ -1518,7 +1523,7 @@ def start_experiments_provider_object_detection_component(export_to_csv: bool = 
                     
                     requirements = web3.toText(event['args']['requirements'])
 
-                    requested_service, requested_replicas = extract_service_erquirements(requirements.rstrip('\x00'))
+                    requested_service, requested_replicas = extract_service_requirements(requirements.rstrip('\x00'))
 
                     if GetServiceState(service_id) == 0:
                         open_services.append(service_id)

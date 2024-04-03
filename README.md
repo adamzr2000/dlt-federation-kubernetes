@@ -1,5 +1,15 @@
 # DLT Service Federation using Kubernetes
 
+MicroK8s v1.28.7 revision 6541
+
+<div align="center">
+
+[![Static Badge](https://img.shields.io/badge/MicroK8s-v1.28.7-orange)](https://github.com/canonical/microk8s/tree/1.28)
+
+[![Static Badge](https://img.shields.io/badge/Docker-v25.0.3-blue)](https://github.com/docker)
+
+</div>
+
 ## Overview
 
 The DLT-federation is a component that enables fast, secure and dynamic service federation across 
@@ -11,7 +21,7 @@ Here is a diagram that represents visually the experimental setup:
 
 ![Experimental Setup](images/experimental-setup.svg)
 
-- 2 VMs, each represented as an AD, containing [Docker](https://docs.docker.com/engine/install/ubuntu) and [Microk8s](https://microk8s.io/#install-microk8s)
+- 2 VMs, each represented as an AD, containing [Docker](https://docs.docker.com/engine/install/ubuntu) and [MicroK8s](https://MicroK8s.io/#install-MicroK8s)
 - Both interconnected in bridge mode within [KVM](https://help.ubuntu.com/community/KVM/Networking)
 - Both VMs have access to a blockchain node
 
@@ -42,38 +52,6 @@ cd dlt-node && ./build.sh && cd ../truffle && ./build.sh && cd ../eth-netstats &
 ```bash
 pip3 install -r requirements.txt
 ```
-
-## Microk8s Setup
-### Cluster Installation
-To effortlessly set up a fully-functional, single-node Kubernetes cluster, execute the following command:
-
-```bash
-sudo snap install microk8s --classic
-```
-
-### Helm Integration
-To integrate Helm, the Kubernetes package manager, with your Microk8s cluster, run:
-```bash
-microk8s enable helm helm3
-```
-
-### MetalLB Integration
-**MetalLB** is an open-source, software-based load balancer solution for Kubernetes clusters. It provides a network load balancing functionality by enabling the assignment of external IP addresses to services running within the cluster.
-
-Integrate MetalLB with your Microk8s cluster by executing the following command and specifying the appropriate address pool:
-```bash
-microk8s enable metallb
-
-<Enter IP address range>
-(e.g. 10.5.50.80-10.5.50.90)
-```
-
-Check if the MetalLB driver is running using the following commands:
-```bash
-kubectl get pods -n metallb-system
-kubectl get configmap -n metallb-system
-```
-
 
 ## Blockchain Network Setup
 
@@ -122,7 +100,44 @@ Access the **eth-netsats** web interface for additional information at `http://<
 ./stop_dlt_network.sh
 ```
 
-# Usage
+## MicroK8s Setup
+### Cluster Installation
+To effortlessly set up a fully-functional, single-node Kubernetes cluster, execute the following command:
+
+```bash
+sudo snap install MicroK8s --classic
+```
+
+Add the following lines to your `~/.bash_aliases` file for direct usage of `kubectl` and `helm` commands with MicroK8s:
+```bash
+alias kubectl='MicroK8s kubectl'
+alias helm='MicroK8s helm'
+```
+
+### Helm Integration
+To integrate Helm, the Kubernetes package manager, with your MicroK8s cluster, run:
+```bash
+MicroK8s enable helm 
+```
+
+### MetalLB Integration
+**MetalLB** is an open-source, software-based load balancer solution for Kubernetes clusters. It provides a network load balancing functionality by enabling the assignment of external IP addresses to services running within the cluster.
+
+Integrate MetalLB with your MicroK8s cluster by executing the following command and specifying the appropriate address pool:
+```bash
+MicroK8s enable metallb
+
+<Enter IP address range>
+(e.g. 10.5.50.80-10.5.50.90)
+```
+
+Check if the MetalLB driver is running using the following commands:
+```bash
+kubectl get pods -n metallb-system
+kubectl get configmap -n metallb-system
+```
+
+## Usage
 
 **Note:** Before starting, ensure to export the Kubernetes cluster configuration file for each VM. Navigate to the `k8s-cluster-config` directory and execute `./export_k8s_cluster_config`
 
@@ -184,6 +199,37 @@ curl -X DELETE http://<vm2-ip-address>:8000/delete_object_detection_service
 ## Scenario 2: migration of the object detection component
 
 The consumer AD initiates the service deployment:
+```bash
+curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service
+```
+
+The provider AD listens for federation events and the consumer AD trigger federation process:
+```bash
+# VM2
+curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v2
+
+# VM1
+curl -X POST http://<vm1-ip-address>:8000/start_experiments_consumer_v2
+```
+
+**Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
+
+Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD. The consumer AD then terminates its object detection component and updates the configmap of the `sampler-sender` to direct the video stream to the `external_ip` endpoint of the object detection component (shared via the smart contract).
+
+To verify, execute `kubectl get configmap sampler-sender-config-map -o yaml` in the consumer AD. The `destination_ip` value should match the `external_ip` of the object detection component deployed in the provider AD.
+
+To delete the service, execute:
+```bash
+# VM1
+curl -X DELETE http://<vm1-ip-address>:8000/delete_object_detection_service
+
+# VM2
+curl -X DELETE "http://<vm2-ip-address>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
+```
+
+## Scenario 3: scaling of the object detection component
+
+The consumer AD initiates the service deployment with N replicas of the object detector component:
 ```bash
 curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service
 ```
