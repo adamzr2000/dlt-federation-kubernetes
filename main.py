@@ -1359,18 +1359,35 @@ def update_configmap_and_restart_deployment(service_ip):
         return
 
 
-def scale_deployment(deployment_name, replicas):
+def scale_deployment(deployment_name, replicas, action="up"):
     try:
-        subprocess.run([
-            "kubectl", "scale", "deployment", deployment_name,
-            f"--replicas={replicas}"
-        ], check=True)
+        # Retrieve current number of replicas
+        deployment_info = api_instance_appsV1.read_namespaced_deployment(
+            name=deployment_name,
+            namespace="default"
+        )
+        current_replicas = deployment_info.spec.replicas
         
-        print(f"Deployment '{deployment_name}' scaled to {replicas} replicas successfully.")
+        if action == "up":
+            new_replicas = current_replicas + replicas
+        elif action == "down":
+            new_replicas = max(current_replicas - replicas, 0)
+        else:
+            raise ValueError("Action must be either 'up' or 'down'")
+        
+        # Scale the deployment
+        patch_body = {"spec": {"replicas": new_replicas}}
+        api_instance_appsV1.patch_namespaced_deployment_scale(
+            name=deployment_name,
+            namespace="default",
+            body=patch_body
+        )
+        
+        print(f"Deployment '{deployment_name}' scaled {action} by {abs(new_replicas - current_replicas)} replicas successfully.")
 
         # Wait for pods to start after scaling
         wait_for_pods_started([deployment_name + "-"])
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         print(f"Error: {e}")
         return
 
@@ -1730,9 +1747,7 @@ def start_experiments_consumer_object_detection_component(export_to_csv: bool = 
                 print(f"Data exported to CSV for {domain}.")
                 # delete_object_detection_federation_component("consumer", ["frontend-", "sampler-sender-", "receiver-encoder-publisher-", "mediamtx-"])
             else:
-                # api_instance_appsV1.delete_namespaced_deployment(name="object-detector", namespace="default")
-                # api_instance_coreV1.delete_namespaced_service(name="object-detector-service", namespace="default")
-                # wait_for_pods_terminated(["object-detector-"])
+                scale_deployment("object-detector", replicas, action="down")
                 print("CSV export not requested.")
 
             return {"message": f"Federation process completed in {total_duration:.2f} seconds"}

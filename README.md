@@ -1,6 +1,6 @@
 # DLT Service Federation using Kubernetes
 
-<div>
+<div align="center">
 
 [![Static Badge](https://img.shields.io/badge/MicroK8s-v1.28.7-orange)](https://github.com/canonical/microk8s/tree/1.28)
 
@@ -80,15 +80,15 @@ cd dlt-network-docker
 After starting the blockchain network, you can verify that the nodes have associated correctly by executing the following commands:
 ```bash
 # VM1
-docker exec -it node1 geth --exec "net.peerCount" attach ws://<vm1-ip-address>:3334
+docker exec -it node1 geth --exec "net.peerCount" attach ws://<VM1-IP-ADDR>:3334
 
 # VM2  
-docker exec -it node2 geth --exec "net.peerCount" attach ws://<vm2-ip-address>:3335
+docker exec -it node2 geth --exec "net.peerCount" attach ws://<VM2-IP-ADDR>:3335
 ```
 
 Each command should report `1 peer`, indicating that the nodes have successfully connected to each other.
 
-Access the **eth-netsats** web interface for additional information at `http://<vm1-ip-address>:3000`
+Access the **eth-netsats** web interface for additional information at `http://<VM1-IP-ADDR>:3000`
 
 4. Stop the network:
 
@@ -159,26 +159,26 @@ For detailed information about the federation functions, refer to the REST API d
 
 ```bash
 # VM1 
-curl -X POST http://<vm1-ip-address>:8000/register_domain
+curl -X POST http://<VM1-IP-ADDR>:8000/register_domain
 
 # VM2 
-curl -X POST http://<vm2-ip-address>:8000/register_domain
+curl -X POST http://<VM2-IP-ADDR>:8000/register_domain
 ```
 
-## Scenario 1: migration of the entire object detection K8s service
+## Scenario 1: migration of the entire object detection service
 
 The consumer AD initiates the service deployment:
 ```bash
-curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service
+curl -X POST http://<VM1-IP-ADDR>:8000/deploy_object_detection_service
 ```
 
 The provider AD listens for federation events and the consumer AD trigger federation process:
 ```bash
 # VM2
-curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v1
+curl -X POST http://<VM2-IP-ADDR>:8000/start_experiments_provider_v1
 
 # VM1
-curl -X POST http://<vm1-ip-address>:8000/start_experiments_consumer_v1
+curl -X POST http://<VM1-IP-ADDR>:8000/start_experiments_consumer_v1
 ```
 
 **Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
@@ -188,26 +188,26 @@ Upon successful completion of the federation procedures, the entire service shou
 To delete the service, execute:
 ```bash
 # VM1
-curl -X DELETE http://<vm1-ip-address>:8000/delete_object_detection_service
+curl -X DELETE http://<VM1-IP-ADDR>:8000/delete_object_detection_service
 
 # VM2
-curl -X DELETE http://<vm2-ip-address>:8000/delete_object_detection_service
+curl -X DELETE http://<VM2-IP-ADDR>:8000/delete_object_detection_service
 ```
 
 ## Scenario 2: migration of the object detection component
 
 The consumer AD initiates the service deployment:
 ```bash
-curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service
+curl -X POST http://<VM1-IP-ADDR>:8000/deploy_object_detection_service
 ```
 
 The provider AD listens for federation events and the consumer AD trigger federation process:
 ```bash
 # VM2
-curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v2
+curl -X POST http://<VM2-IP-ADDR>:8000/start_experiments_provider_v2
 
 # VM1
-curl -X POST http://<vm1-ip-address>:8000/start_experiments_consumer_v2
+curl -X POST http://<VM1-IP-ADDR>:8000/start_experiments_consumer_v2
 ```
 
 **Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
@@ -219,37 +219,37 @@ To verify, execute `kubectl get configmap sampler-sender-config-map -o yaml` in 
 To delete the service, execute:
 ```bash
 # VM1
-curl -X DELETE http://<vm1-ip-address>:8000/delete_object_detection_service
+curl -X DELETE http://<VM1-IP-ADDR>:8000/delete_object_detection_service
 
 # VM2
-curl -X DELETE "http://<vm2-ip-address>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
+curl -X DELETE "http://<VM2-IP-ADDR>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
 ```
 
 ## Scenario 3: scaling of the object detection component
 
 The consumer AD initiates the service deployment with N replicas (e.g., 6) of the object detector component:
 ```bash
-curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service?replicas=6
+curl -X POST http://<VM1-IP-ADDR>:8000/deploy_object_detection_service?replicas=6
 ```
 
-The provider AD listens for federation events and the consumer AD trigger federation process:
+The provider AD listens for federation events and the consumer AD trigger the federation process, announcing its intention to scale M replicas (e.g., 4):
 ```bash
 # VM2
-curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v3
+curl -X POST http://<VM2-IP-ADDR>:8000/start_experiments_provider_v3
 
 # VM1
-curl -X POST http://<vm1-ip-address>:8000/start_experiments_consumer_v3?replicas=4
+curl -X POST http://<VM1-IP-ADDR>:8000/start_experiments_consumer_v3?replicas=4
 ```
 
 **Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
 
-Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD with the requested number of replicas. 
+Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD with M replicas, while the consumer AD should have N-M replicas deployed.
 
 To delete the service, execute:
 ```bash
 # VM1
-curl -X DELETE http://<vm1-ip-address>:8000/delete_object_detection_service
+curl -X DELETE http://<VM1-IP-ADDR>:8000/delete_object_detection_service
 
 # VM2
-curl -X DELETE "http://<vm2-ip-address>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
+curl -X DELETE "http://<VM2-IP-ADDR>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
 ```
