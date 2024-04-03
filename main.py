@@ -596,7 +596,7 @@ def deploy_object_detection_federation_component(domain, service_to_wait, replic
 
         # If replicas parameter is different than 1, add the replicas flag to Helm command
         if replicas != 1:
-            helm_command_core.extend(["--set", f"deployments[4].replicas={replicas}"])
+            helm_command_core.extend(["--set", f"deployments[0].replicas={replicas}"])
 
         subprocess.run(helm_command_core, cwd=dir_path, check=True)
         print("Configmaps and deployments were applied successfully.")
@@ -773,7 +773,7 @@ def deploy_object_detection_federation_component_endpoint(domain: str, service_t
     Endpoint to create object detection service
     """
     try:
-        service_ip = deploy_object_detection_federation_component(domain, service_to_wait)
+        service_ip = deploy_object_detection_federation_component(domain, service_to_wait, replicas=5)
         return {"message": f"Service deployed. {service_to_wait} IP = {service_ip}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
