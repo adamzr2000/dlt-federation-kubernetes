@@ -1,8 +1,6 @@
 # DLT Service Federation using Kubernetes
 
-MicroK8s v1.28.7 revision 6541
-
-<div align="center">
+<div>
 
 [![Static Badge](https://img.shields.io/badge/MicroK8s-v1.28.7-orange)](https://github.com/canonical/microk8s/tree/1.28)
 
@@ -105,19 +103,19 @@ Access the **eth-netsats** web interface for additional information at `http://<
 To effortlessly set up a fully-functional, single-node Kubernetes cluster, execute the following command:
 
 ```bash
-sudo snap install MicroK8s --classic
+sudo snap install icroK8s --classic
 ```
 
 Add the following lines to your `~/.bash_aliases` file for direct usage of `kubectl` and `helm` commands with MicroK8s:
 ```bash
-alias kubectl='MicroK8s kubectl'
-alias helm='MicroK8s helm'
+alias kubectl='microK8s kubectl'
+alias helm='microK8s helm'
 ```
 
 ### Helm Integration
 To integrate Helm, the Kubernetes package manager, with your MicroK8s cluster, run:
 ```bash
-MicroK8s enable helm 
+microK8s enable helm 
 ```
 
 ### MetalLB Integration
@@ -125,7 +123,7 @@ MicroK8s enable helm
 
 Integrate MetalLB with your MicroK8s cluster by executing the following command and specifying the appropriate address pool:
 ```bash
-MicroK8s enable metallb
+microK8s enable metallb
 
 <Enter IP address range>
 (e.g. 10.5.50.80-10.5.50.90)
@@ -229,25 +227,23 @@ curl -X DELETE "http://<vm2-ip-address>:8000/delete_object_detection_federation_
 
 ## Scenario 3: scaling of the object detection component
 
-The consumer AD initiates the service deployment with N replicas of the object detector component:
+The consumer AD initiates the service deployment with N replicas (e.g., 6) of the object detector component:
 ```bash
-curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service
+curl -X POST http://<vm1-ip-address>:8000/deploy_object_detection_service?replicas=6
 ```
 
 The provider AD listens for federation events and the consumer AD trigger federation process:
 ```bash
 # VM2
-curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v2
+curl -X POST http://<vm2-ip-address>:8000/start_experiments_provider_v3
 
 # VM1
-curl -X POST http://<vm1-ip-address>:8000/start_experiments_consumer_v2
+curl -X POST http://<vm1-ip-address>:8000/start_experiments_consumer_v3?replicas=4
 ```
 
 **Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
 
-Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD. The consumer AD then terminates its object detection component and updates the configmap of the `sampler-sender` to direct the video stream to the `external_ip` endpoint of the object detection component (shared via the smart contract).
-
-To verify, execute `kubectl get configmap sampler-sender-config-map -o yaml` in the consumer AD. The `destination_ip` value should match the `external_ip` of the object detection component deployed in the provider AD.
+Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD with the requested number of replicas. 
 
 To delete the service, execute:
 ```bash
