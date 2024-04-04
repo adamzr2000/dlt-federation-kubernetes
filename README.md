@@ -79,15 +79,15 @@ cd dlt-network-docker
 After starting the blockchain network, you can verify that the nodes have associated correctly by executing the following commands:
 ```bash
 # VM1
-docker exec -it node1 geth --exec "net.peerCount" attach ws://<VM1-IP-ADDR>:3334
+docker exec -it node1 geth --exec "net.peerCount" attach ws://<vm1-ip>:3334
 
 # VM2  
-docker exec -it node2 geth --exec "net.peerCount" attach ws://<VM2-IP-ADDR>:3335
+docker exec -it node2 geth --exec "net.peerCount" attach ws://<vm2-ip>:3335
 ```
 
 Each command should report `1 peer`, indicating that the nodes have successfully connected to each other.
 
-Access the **eth-netsats** web interface for additional information at `http://<VM1-IP-ADDR>:3000`
+Access the `eth-netsats` web interface for additional information at `http://<vm1-ip>:3000`
 
 4. Stop the network:
 
@@ -211,9 +211,9 @@ curl -X POST http://<vm1-ip>:8000/start_experiments_consumer_v2
 
 > Note: These commands will automate all interactions during the federation, including *announcement*, *negotiation*, *acceptance*, and *deployment*.
 
-Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD. The consumer AD then terminates its object detection component and updates the configmap of the *sampler-sender* to direct the video stream to the *external IP address* endpoint of the object detection component (shared via the smart contract).
+Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD. The consumer AD then terminates its object detection component and updates the configmap of the `sampler-sender` to direct the video stream to the `external IP address` endpoint of the object detection component (shared via the smart contract).
 
-To verify, execute `kubectl get configmap sampler-sender-config-map -o yaml` in the consumer AD. The *destination_ip* value should match the *external IP address* of the object detection component deployed in the provider AD.
+To verify, execute `kubectl get configmap sampler-sender-config-map -o yaml` in the consumer AD. The `destination_ip` value should match the `external IP address` of the object detection component deployed in the provider AD.
 
 To delete the service, execute:
 ```bash
