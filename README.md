@@ -10,18 +10,17 @@
 
 ## Overview
 
-The DLT-federation is a component that enables fast, secure and dynamic service federation across 
-different administrative domains (ADs) by using distributed ledger technologies (DLTs). More specifically, the federation procedures are stored and deployed on a Federation Smart Contract which is running on top of a permissioned blockchain. Each domain sets up a blockchain node to gain access to the blockchain network. 
-
-**Author:** Adam Zahir Rodriguez
+Federation of services aims to provide orchestration of services across multiple administrative domains (ADs). This project showcases how different ADs can establish federation efficiently using distributed ledger technologies (DLT) as a mediatior in the process. More specifically, the federation procedures are stored and deployed on a Federation Smart Contract, which is running on top of a permissioned blockchain. Each AD sets up a blockchain node to gain access to the blockchain network and they interact with the Federation Smart Contract by sending transactions.
 
 Here is a diagram that represents visually the experimental setup:
 
 ![Experimental Setup](images/experimental-setup.svg)
 
-- 2 VMs, each represented as an AD, containing [Docker](https://docs.docker.com/engine/install/ubuntu) and [MicroK8s](https://MicroK8s.io/#install-MicroK8s)
+- 2 VMs, each acting as a separate AD, containing [Docker](https://docs.docker.com/engine/install/ubuntu) and [MicroK8s](https://MicroK8s.io/#install-MicroK8s)
 - Both interconnected in bridge mode within [KVM](https://help.ubuntu.com/community/KVM/Networking)
 - Both VMs have access to a blockchain node
+
+**Author:** Adam Zahir Rodriguez
 
 ## Installation
 
@@ -103,7 +102,7 @@ Access the **eth-netsats** web interface for additional information at `http://<
 To effortlessly set up a fully-functional, single-node Kubernetes cluster, execute the following command:
 
 ```bash
-sudo snap install icroK8s --classic
+sudo snap install microK8s --classic
 ```
 
 Add the following lines to your `~/.bash_aliases` file for direct usage of `kubectl` and `helm` commands with MicroK8s:
@@ -153,32 +152,32 @@ cd smart-contracts
 ./start_app.sh
 ```
 
-For detailed information about the federation functions, refer to the REST API documentation, which is based on Swagger UI, at: `http://<vm-ip-address>:8000/docs`
+For detailed information about the federation functions, refer to the REST API documentation, which is based on Swagger UI, at: `http://<vm-ip>:8000/docs`
 
 3. Register each AD in the Smart Contract to enable their participation in the federation:
 
 ```bash
 # VM1 
-curl -X POST http://<VM1-IP-ADDR>:8000/register_domain
+curl -X POST http://<vm1-ip>:8000/register_domain
 
 # VM2 
-curl -X POST http://<VM2-IP-ADDR>:8000/register_domain
+curl -X POST http://<vm2-ip>:8000/register_domain
 ```
 
 ## Scenario 1: migration of the entire object detection service
 
 The consumer AD initiates the service deployment:
 ```bash
-curl -X POST http://<VM1-IP-ADDR>:8000/deploy_object_detection_service
+curl -X POST http://<vm1-ip>:8000/deploy_object_detection_service
 ```
 
 The provider AD listens for federation events and the consumer AD trigger federation process:
 ```bash
 # VM2
-curl -X POST http://<VM2-IP-ADDR>:8000/start_experiments_provider_v1
+curl -X POST http://<vm2-ip>:8000/start_experiments_provider_v1
 
 # VM1
-curl -X POST http://<VM1-IP-ADDR>:8000/start_experiments_consumer_v1
+curl -X POST http://<vm1-ip>:8000/start_experiments_consumer_v1
 ```
 
 **Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
@@ -188,26 +187,26 @@ Upon successful completion of the federation procedures, the entire service shou
 To delete the service, execute:
 ```bash
 # VM1
-curl -X DELETE http://<VM1-IP-ADDR>:8000/delete_object_detection_service
+curl -X DELETE http://<vm1-ip>:8000/delete_object_detection_service
 
 # VM2
-curl -X DELETE http://<VM2-IP-ADDR>:8000/delete_object_detection_service
+curl -X DELETE http://<vm2-ip>:8000/delete_object_detection_service
 ```
 
 ## Scenario 2: migration of the object detection component
 
 The consumer AD initiates the service deployment:
 ```bash
-curl -X POST http://<VM1-IP-ADDR>:8000/deploy_object_detection_service
+curl -X POST http://<vm1-ip>:8000/deploy_object_detection_service
 ```
 
 The provider AD listens for federation events and the consumer AD trigger federation process:
 ```bash
 # VM2
-curl -X POST http://<VM2-IP-ADDR>:8000/start_experiments_provider_v2
+curl -X POST http://<vm2-ip>:8000/start_experiments_provider_v2
 
 # VM1
-curl -X POST http://<VM1-IP-ADDR>:8000/start_experiments_consumer_v2
+curl -X POST http://<vm1-ip>:8000/start_experiments_consumer_v2
 ```
 
 **Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
@@ -219,26 +218,26 @@ To verify, execute `kubectl get configmap sampler-sender-config-map -o yaml` in 
 To delete the service, execute:
 ```bash
 # VM1
-curl -X DELETE http://<VM1-IP-ADDR>:8000/delete_object_detection_service
+curl -X DELETE http://<vm1-ip>:8000/delete_object_detection_service
 
 # VM2
-curl -X DELETE "http://<VM2-IP-ADDR>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
+curl -X DELETE "http://<vm2-ip>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
 ```
 
 ## Scenario 3: scaling of the object detection component
 
 The consumer AD initiates the service deployment with N replicas (e.g., 6) of the object detector component:
 ```bash
-curl -X POST http://<VM1-IP-ADDR>:8000/deploy_object_detection_service?replicas=6
+curl -X POST http://<vm1-ip>:8000/deploy_object_detection_service?replicas=6
 ```
 
 The provider AD listens for federation events and the consumer AD trigger the federation process, announcing its intention to scale M replicas (e.g., 4):
 ```bash
 # VM2
-curl -X POST http://<VM2-IP-ADDR>:8000/start_experiments_provider_v3
+curl -X POST http://<vm2-ip>:8000/start_experiments_provider_v3
 
 # VM1
-curl -X POST http://<VM1-IP-ADDR>:8000/start_experiments_consumer_v3?replicas=4
+curl -X POST http://<vm1-ip>:8000/start_experiments_consumer_v3?replicas=4
 ```
 
 **Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
@@ -248,8 +247,8 @@ Upon successful completion of the federation procedures, the object detection co
 To delete the service, execute:
 ```bash
 # VM1
-curl -X DELETE http://<VM1-IP-ADDR>:8000/delete_object_detection_service
+curl -X DELETE http://<vm1-ip>:8000/delete_object_detection_service
 
 # VM2
-curl -X DELETE "http://<VM2-IP-ADDR>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
+curl -X DELETE "http://<vm2-ip>:8000/delete_object_detection_federation_component" -H "Content-Type: application/json" -d '{"domain": "provider", "pod_prefixes": ["object-detector-"]}'
 ```
