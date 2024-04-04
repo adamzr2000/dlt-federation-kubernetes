@@ -43,7 +43,7 @@ cd dlt-node && ./build.sh && cd ../truffle && ./build.sh && cd ../eth-netstats &
 
 - `eth-netstats`: Dashboard for monitoring Geth nodes within the blockchain network
 
-**Note:** For building images corresponding to the object detection service, please consult the [README](https://gitlab.com/netmode/6g-latency-sensitive-service) file located in the `descriptors/6g-latency-sensitive-service` directory
+> Note: For building images corresponding to the object detection service, please consult the [README](https://gitlab.com/netmode/6g-latency-sensitive-service) file located in the `descriptors/6g-latency-sensitive-service` directory
 
 3. Install the necessary python dependencies:
 ```bash
@@ -58,7 +58,7 @@ Firstly, we will create a blockchain network using `dlt-node` container images. 
 
 **(VM1)** Navigate to the `dlt-network-docker` directory and start the network setup:
 
-**Note:** Please make sure to modify the IP addresses in the `.env` file according to your setup before executing the script. Replace `IP_NODE_1` with the IP address of your **VM1** and `IP_NODE_2` with the IP address of your **VM2**.
+> Note: Please make sure to modify the IP addresses in the `.env` file according to your setup before executing the script. Replace `IP_NODE_1` with the IP address of your **VM1** and `IP_NODE_2` with the IP address of your **VM2**.
 
 ```bash
 cd dlt-network-docker
@@ -102,19 +102,19 @@ Access the **eth-netsats** web interface for additional information at `http://<
 To effortlessly set up a fully-functional, single-node Kubernetes cluster, execute the following command:
 
 ```bash
-sudo snap install microK8s --classic
+sudo snap install microk8s --classic
 ```
 
 Add the following lines to your `~/.bash_aliases` file for direct usage of `kubectl` and `helm` commands with MicroK8s:
 ```bash
-alias kubectl='microK8s kubectl'
-alias helm='microK8s helm'
+alias kubectl='microk8s kubectl'
+alias helm='microk8s helm'
 ```
 
 ### Helm Integration
 To integrate Helm, the Kubernetes package manager, with your MicroK8s cluster, run:
 ```bash
-microK8s enable helm 
+microk8s enable helm 
 ```
 
 ### MetalLB Integration
@@ -122,7 +122,7 @@ microK8s enable helm
 
 Integrate MetalLB with your MicroK8s cluster by executing the following command and specifying the appropriate address pool:
 ```bash
-microK8s enable metallb
+microk8s enable metallb
 
 <Enter IP address range>
 (e.g. 10.5.50.80-10.5.50.90)
@@ -136,7 +136,7 @@ kubectl get configmap -n metallb-system
 
 ## Usage
 
-**Note:** Before starting, ensure to export the Kubernetes cluster configuration file for each VM. Navigate to the `k8s-cluster-config` directory and execute `./export_k8s_cluster_config`
+> Note: Before starting, ensure to export the Kubernetes cluster configuration file for each VM. Navigate to the `k8s-cluster-config` directory and execute `./export_k8s_cluster_config`
 
 1. Deploy the Federation Smart Contract to the blockchain Network:
 
@@ -180,7 +180,7 @@ curl -X POST http://<vm2-ip>:8000/start_experiments_provider_v1
 curl -X POST http://<vm1-ip>:8000/start_experiments_consumer_v1
 ```
 
-**Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
+> Note: These commands will automate all interactions during the federation, including *announcement*, *negotiation*, *acceptance*, and *deployment*.
 
 Upon successful completion of the federation procedures, the entire service should be deployed in the provider AD, and the consumer AD can access it through the `external_ip` endpoint (shared via the smart contract)
 
@@ -209,11 +209,11 @@ curl -X POST http://<vm2-ip>:8000/start_experiments_provider_v2
 curl -X POST http://<vm1-ip>:8000/start_experiments_consumer_v2
 ```
 
-**Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
+> Note: These commands will automate all interactions during the federation, including *announcement*, *negotiation*, *acceptance*, and *deployment*.
 
-Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD. The consumer AD then terminates its object detection component and updates the configmap of the `sampler-sender` to direct the video stream to the `external_ip` endpoint of the object detection component (shared via the smart contract).
+Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD. The consumer AD then terminates its object detection component and updates the configmap of the *sampler-sender* to direct the video stream to the *external IP address* endpoint of the object detection component (shared via the smart contract).
 
-To verify, execute `kubectl get configmap sampler-sender-config-map -o yaml` in the consumer AD. The `destination_ip` value should match the `external_ip` of the object detection component deployed in the provider AD.
+To verify, execute `kubectl get configmap sampler-sender-config-map -o yaml` in the consumer AD. The *destination_ip* value should match the *external IP address* of the object detection component deployed in the provider AD.
 
 To delete the service, execute:
 ```bash
@@ -240,7 +240,7 @@ curl -X POST http://<vm2-ip>:8000/start_experiments_provider_v3
 curl -X POST http://<vm1-ip>:8000/start_experiments_consumer_v3?replicas=4
 ```
 
-**Note:** These commands will automate all interactions during the federation, including `announcement`, `negotiation`, `acceptance`, and `deployment`.
+> Note: These commands will automate all interactions during the federation, including *announcement*, *negotiation*, *acceptance*, and *deployment*.
 
 Upon successful completion of the federation procedures, the object detection component should be deployed in the provider AD with M replicas, while the consumer AD should have N-M replicas deployed.
 
