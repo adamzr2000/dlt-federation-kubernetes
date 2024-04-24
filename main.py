@@ -1180,7 +1180,7 @@ def start_experiments_consumer_entire_service(export_to_csv: bool = False):
             external_ip = external_ip.decode('utf-8')
             service_endpoint_provider = service_endpoint_provider.decode('utf-8')
 
-            print("Service deployed info:")
+            print("Federated service info:")
             print("External IP:", external_ip)
             print("Service endpoint provider:", service_endpoint_provider)
 
@@ -1243,7 +1243,7 @@ def start_experiments_provider_entire_service(export_to_csv: bool = False):
             open_services = []
 
             # Provider AD wait for service announcements
-            print("\Subscribed to federation events...")
+            print("Subscribed to federation events...")
             while newService == False:
                 new_events = newService_event.get_all_entries()
                 for event in new_events:
@@ -1471,7 +1471,7 @@ def start_experiments_consumer_object_detection_component(export_to_csv: bool = 
             external_ip = external_ip.decode('utf-8')
             service_endpoint_provider = service_endpoint_provider.decode('utf-8')
 
-            print("Service deployed info:")
+            print("Federated service info:")
             print("External IP:", external_ip)
             print("Service endpoint provider:", service_endpoint_provider)
 
@@ -1539,6 +1539,7 @@ def start_experiments_provider_object_detection_component(export_to_csv: bool = 
             open_services = []
 
             # Provider AD wait for service announcements
+            print("Subscribed to federation events...")
             while newService == False:
                 new_events = newService_event.get_all_entries()
                 for event in new_events:
@@ -1550,7 +1551,7 @@ def start_experiments_provider_object_detection_component(export_to_csv: bool = 
 
                     if GetServiceState(service_id) == 0:
                         open_services.append(service_id)
-                print("OPEN =", len(open_services)) 
+                # print("OPEN =", len(open_services)) 
                 if len(open_services) > 0:
                     
                     # Announcement received
@@ -1716,7 +1717,7 @@ def start_experiments_consumer_object_detection_component(export_to_csv: bool = 
             external_ip = external_ip.decode('utf-8')
             service_endpoint_provider = service_endpoint_provider.decode('utf-8')
 
-            print("Service deployed info:")
+            print("Federated service info:")
             print("External IP:", external_ip)
             print("Service endpoint provider:", service_endpoint_provider)
 
@@ -1782,6 +1783,7 @@ def start_experiments_provider_object_detection_component(export_to_csv: bool = 
             open_services = []
 
             # Provider AD wait for service announcements
+            print("Subscribed to federation events...")
             while newService == False:
                 new_events = newService_event.get_all_entries()
                 for event in new_events:
@@ -1793,7 +1795,7 @@ def start_experiments_provider_object_detection_component(export_to_csv: bool = 
 
                     if GetServiceState(service_id) == 0:
                         open_services.append(service_id)
-                print("OPEN =", len(open_services)) 
+                # print("OPEN =", len(open_services)) 
                 if len(open_services) > 0:
                     
                     # Announcement received
