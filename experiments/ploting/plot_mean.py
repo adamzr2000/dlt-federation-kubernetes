@@ -61,10 +61,10 @@ for i, step in enumerate(ordered_steps):
 plt.yticks(range(len(ordered_steps)), ordered_steps)
 plt.xlabel('Time (s)')
 plt.ylabel('Phases')
-plt.title('Mean start and end times of each federation step')
+# plt.title('Mean start and end times of each federation step')
 plt.tight_layout()
 plt.gca().invert_yaxis()
-plt.savefig('federation_events_mean.pdf')
+plt.savefig('federation_events_mean.svg')
 plt.show()
 
 
@@ -86,8 +86,8 @@ for bar, time in zip(barplot, mean_times):
 
 plt.xlabel('Time (s)')
 plt.ylabel('Domain')
-plt.title('Mean accumulated time')
+# plt.title('Mean accumulated time')
 plt.tight_layout()
 plt.gca().invert_yaxis()
-plt.savefig('accumulated_time_mean.pdf')
+plt.savefig('accumulated_time_mean.svg')
 plt.show()
