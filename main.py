@@ -558,7 +558,7 @@ def deploy_entire_object_detection_service(replicas=1):
         print(f"Failed to apply services: {e}")
         return None
 
-    print("\nConfiguration completed successfully.")
+    # print("\nConfiguration completed successfully.")
     return mediamtx_service_ip
 
 
@@ -610,7 +610,7 @@ def deploy_object_detection_federation_component(domain, service_to_wait, replic
         print(f"Failed to apply services: {e}")
         return None
 
-    print("\nConfiguration completed successfully.")
+    # print("\nConfiguration completed successfully.")
     return service_ip
 
 
@@ -1205,7 +1205,7 @@ def start_experiments_consumer_entire_service(export_to_csv: bool = False):
 
             total_duration = time.time() - process_start_time
 
-            print("Successfully connected to the federated service")
+            print(f"Federation process completed in {total_duration:.2f} seconds")
             # print(response_content)
 
             if export_to_csv:
@@ -1243,6 +1243,7 @@ def start_experiments_provider_entire_service(export_to_csv: bool = False):
             open_services = []
 
             # Provider AD wait for service announcements
+            print("\Subscribed to federation events...")
             while newService == False:
                 new_events = newService_event.get_all_entries()
                 for event in new_events:
@@ -1254,7 +1255,7 @@ def start_experiments_provider_entire_service(export_to_csv: bool = False):
                     
                     if GetServiceState(service_id) == 0:
                         open_services.append(service_id)
-                print("OPEN =", len(open_services)) 
+                # print("OPEN =", len(open_services)) 
                 if len(open_services) > 0:
                     
                     # Announcement received
@@ -1298,6 +1299,7 @@ def start_experiments_provider_entire_service(export_to_csv: bool = False):
                 am_i_winner = CheckWinner(service_id)
                 if am_i_winner == True:
                     # Start deployment of the requested federated service
+                    print("Start deployment of the requested federated service...")
                     t_deployment_start = time.time() - process_start_time
                     data.append(['deployment_start', t_deployment_start])
                     # print("I am the winner")
@@ -1495,8 +1497,9 @@ def start_experiments_consumer_object_detection_component(export_to_csv: bool = 
             total_duration = time.time() - process_start_time
 
             update_configmap_and_restart_deployment(external_ip)
-            print("Successfully connected to the federated service")
+            # print("Successfully connected to the federated service")
             # print(response_content)
+            print(f"Federation process completed in {total_duration:.2f} seconds")
 
             if export_to_csv:
                 # Export the data to a csv file only if export_to_csv is True
@@ -1591,6 +1594,7 @@ def start_experiments_provider_object_detection_component(export_to_csv: bool = 
                 am_i_winner = CheckWinner(service_id)
                 if am_i_winner == True:
                     # Start deployment of the requested federated service
+                    print("Start deployment of the requested federated service...")
                     t_deployment_start = time.time() - process_start_time
                     data.append(['deployment_start', t_deployment_start])
                     # print("I am the winner")
@@ -1738,8 +1742,9 @@ def start_experiments_consumer_object_detection_component(export_to_csv: bool = 
             total_duration = time.time() - process_start_time
 
             update_configmap_and_restart_deployment(external_ip)
-            print("Successfully connected to the federated service")
+            # print("Successfully connected to the federated service")
             # print(response_content)
+            print(f"Federation process completed in {total_duration:.2f} seconds")
 
             if export_to_csv:
                 # Export the data to a csv file only if export_to_csv is True
@@ -1832,6 +1837,7 @@ def start_experiments_provider_object_detection_component(export_to_csv: bool = 
                 am_i_winner = CheckWinner(service_id)
                 if am_i_winner == True:
                     # Start deployment of the requested federated service
+                    print("Start deployment of the requested federated service...")
                     t_deployment_start = time.time() - process_start_time
                     data.append(['deployment_start', t_deployment_start])
                     # print("I am the winner")
